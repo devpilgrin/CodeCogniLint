@@ -16,7 +16,7 @@ export function Header({ contextHealth, workspace, onAnalyzeProject, analyzing }
       <div className="flex items-center space-x-4">
         <div className="flex items-center text-blue-400 font-bold tracking-tight">
           <FontAwesomeIcon icon={faMicrochip} className="mr-2" />
-          <span>HYBRID_CORE v1.0</span>
+          <span>CodeCogniLint v1.0</span>
         </div>
         <div className="h-4 w-[1px] bg-[#30363d]" />
         <div className="text-xs text-gray-400 flex items-center">

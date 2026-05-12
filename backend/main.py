@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import rules, analysis, settings, workspace, reports
 
-app = FastAPI(title="Hybrid Code Analysis API", version="1.0.0")
+app = FastAPI(title="CodeCogniLint API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

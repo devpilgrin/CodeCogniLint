@@ -1,6 +1,8 @@
-# Hybrid Code Analysis
+# CodeCogniLint
 
 Гибридная система анализа кода для веба: статистика Git-истории + семантическое понимание LLM. IDE-подобный интерфейс с редактором Monaco, динамическими правилами и поддержкой как облачных, так и локальных моделей.
+
+![Скриншот интерфейса CodeCogniLint](image/scren.png)
 
 ---
 
@@ -155,7 +157,7 @@ LLM_API_KEY=lm-studio
 ## Структура проекта
 
 ```
-HybridCodeAnalysis/
+CodeCogniLint/
 ├── backend/
 │   ├── main.py                       # FastAPI app, CORS, регистрация роутеров
 │   ├── requirements.txt
