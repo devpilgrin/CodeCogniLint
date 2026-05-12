@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBrain, faSyncAlt, faExpandAlt, faRobot,
+  faBrain, faSyncAlt, faExpandAlt, faCompressAlt, faRobot,
   faInfoCircle, faPaperPlane, faCheckCircle,
   faArrowRight, faLightbulb, faComments, faTools,
   faExclamationTriangle,
@@ -18,6 +18,9 @@ interface Props {
   onSendMessage: (text: string) => void;
   onApplyFix: (violation: Violation) => void;
   onJumpToLine: (line: number) => void;
+  onResetData: () => void;
+  tabsCollapsed: boolean;
+  onToggleTabsCollapsed: () => void;
 }
 
 const SCOPE_TABS: { value: AnalysisScope; label: string }[] = [
@@ -53,7 +56,11 @@ const categoryBadge: Record<string, string> = {
   analysis: 'text-orange-300 bg-orange-300/10',
 };
 
-export function AIPanel({ messages, violations, view, onViewChange, onSendMessage, onApplyFix, onJumpToLine }: Props) {
+export function AIPanel({
+  messages, violations, view, onViewChange,
+  onSendMessage, onApplyFix, onJumpToLine,
+  onResetData, tabsCollapsed, onToggleTabsCollapsed,
+}: Props) {
   const [input, setInput] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -85,15 +92,32 @@ export function AIPanel({ messages, violations, view, onViewChange, onSendMessag
             </span>
           )}
         </span>
-        <div className="flex space-x-2 text-gray-500 text-xs">
-          <FontAwesomeIcon icon={faSyncAlt} className="cursor-pointer hover:text-white" />
-          <FontAwesomeIcon icon={faExpandAlt} className="cursor-pointer hover:text-white" />
+        <div className="flex space-x-3 text-gray-500 text-xs">
+          <button
+            onClick={onResetData}
+            title={
+              view === 'file'       ? 'Сбросить результаты по текущему файлу' :
+              view === 'repository' ? 'Сбросить все результаты анализа проекта' :
+              view === 'chat'       ? 'Очистить историю чата' :
+              'Сбросить данные для этой вкладки'
+            }
+            className="hover:text-white transition-colors"
+          >
+            <FontAwesomeIcon icon={faSyncAlt} />
+          </button>
+          <button
+            onClick={onToggleTabsCollapsed}
+            title={tabsCollapsed ? 'Показать все вкладки' : 'Скрыть неактивные scope-вкладки'}
+            className={`transition-colors ${tabsCollapsed ? 'text-blue-400' : 'hover:text-white'}`}
+          >
+            <FontAwesomeIcon icon={tabsCollapsed ? faCompressAlt : faExpandAlt} />
+          </button>
         </div>
       </div>
 
       {/* Tabs: scope tabs + Chat */}
       <div className="flex border-b border-[#30363d] flex-shrink-0 text-[10px] font-semibold">
-        {SCOPE_TABS.map(opt => (
+        {(tabsCollapsed ? SCOPE_TABS.filter(t => t.value === view) : SCOPE_TABS).map(opt => (
           <button
             key={opt.value}
             onClick={() => onViewChange(opt.value)}

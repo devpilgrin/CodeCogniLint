@@ -1,6 +1,7 @@
 import json
 import os
 import string
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -179,6 +180,51 @@ def build_tree(root: str) -> dict:
     tree = walk(root_path, is_root=True) or {"name": root_path.name, "path": "", "type": "directory", "children": []}
     tree["truncated"] = truncated[0]
     return tree
+
+
+def write_file(workspace: str, rel_path: str, content: str) -> dict:
+    """
+    Save text content to a file inside the workspace.
+    Only allows overwriting existing files (no new file creation through this API).
+    """
+    root = Path(workspace).expanduser().resolve()
+    target = (root / rel_path).resolve()
+
+    # Security: must stay inside workspace
+    try:
+        target.relative_to(root)
+    except ValueError:
+        raise ValueError("Файл за пределами проекта")
+
+    if not target.exists():
+        raise ValueError(f"Файл не существует: {rel_path}")
+    if target.is_dir():
+        raise ValueError("Указан путь к директории, а не к файлу")
+
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_FILE_SIZE:
+        raise ValueError(
+            f"Слишком большое содержимое ({len(encoded) // 1024} КБ). "
+            f"Лимит: {MAX_FILE_SIZE // 1024 // 1024} МБ."
+        )
+
+    # Atomic-ish write: write to .tmp then replace
+    tmp = target.with_suffix(target.suffix + ".hybridtmp")
+    try:
+        tmp.write_bytes(encoded)
+        tmp.replace(target)
+    except OSError as e:
+        if tmp.exists():
+            try: tmp.unlink()
+            except OSError: pass
+        raise ValueError(f"Ошибка записи: {e}")
+
+    return {
+        "path": rel_path,
+        "name": target.name,
+        "size": target.stat().st_size,
+        "saved_at": datetime.now().isoformat(),
+    }
 
 
 def read_file(workspace: str, rel_path: str) -> dict:

@@ -32,6 +32,13 @@ export const settingsApi = {
     api.put<LLMSettings>('/settings', settings).then(r => r.data),
 };
 
+export const reportsApi = {
+  xlsx: (results: Record<string, unknown>) =>
+    api.post('/reports/xlsx', { results }, { responseType: 'blob' }).then(r => r.data as Blob),
+  md: (results: Record<string, unknown>) =>
+    api.post('/reports/md', { results }, { responseType: 'blob' }).then(r => r.data as Blob),
+};
+
 export const workspaceApi = {
   get: () => api.get<WorkspaceState>('/workspace').then(r => r.data),
   open: (path: string) =>
@@ -42,6 +49,10 @@ export const workspaceApi = {
   getTree: () => api.get<TreeNode>('/workspace/tree').then(r => r.data),
   getFile: (path: string) =>
     api.get<FileContentResponse>('/workspace/file', { params: { path } }).then(r => r.data),
+  saveFile: (path: string, content: string) =>
+    api.put<{ path: string; name: string; size: number; saved_at: string }>(
+      '/workspace/file', { path, content }
+    ).then(r => r.data),
   browse: (path?: string) =>
     api.get<BrowseResponse>('/workspace/browse', { params: path ? { path } : {} }).then(r => r.data),
 };

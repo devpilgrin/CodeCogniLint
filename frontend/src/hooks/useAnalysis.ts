@@ -188,8 +188,30 @@ export function useAnalysis() {
     });
   }, []);
 
+  const clearFileResult = useCallback((path: string) => {
+    setResultsByFile(prev => {
+      if (!(path in prev)) return prev;
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  }, []);
+
+  const clearAllResults = useCallback(() => {
+    setResultsByFile({});
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setMessages([{
+      role: 'system',
+      content: 'История чата очищена. Готов к новым вопросам.',
+      timestamp: new Date().toISOString(),
+    }]);
+  }, []);
+
   return {
     resultsByFile, messages, analyzing, progress, stepLabel,
     analyzeFile, analyzeRepository, cancelAnalysis, sendMessage,
+    clearFileResult, clearAllResults, clearMessages,
   };
 }

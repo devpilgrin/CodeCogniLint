@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from services.workspace_service import (
     get_workspace, set_workspace, close_workspace,
-    clone_repo, build_tree, read_file, browse_dir,
+    clone_repo, build_tree, read_file, write_file, browse_dir,
 )
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
@@ -16,6 +16,11 @@ class OpenRequest(BaseModel):
 class CloneRequest(BaseModel):
     url: str
     target: Optional[str] = None
+
+
+class SaveFileRequest(BaseModel):
+    path: str
+    content: str
 
 
 @router.get("")
@@ -63,6 +68,17 @@ def file(path: str = Query(...)):
         raise HTTPException(status_code=404, detail="Проект не открыт")
     try:
         return read_file(ws["current"]["path"], path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/file")
+def save_file(body: SaveFileRequest):
+    ws = get_workspace()
+    if not ws["current"]:
+        raise HTTPException(status_code=404, detail="Проект не открыт")
+    try:
+        return write_file(ws["current"]["path"], body.path, body.content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

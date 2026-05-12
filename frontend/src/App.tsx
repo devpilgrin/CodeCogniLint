@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faWandMagicSparkles, faChartBar } from '@fortawesome/free-solid-svg-icons';
 
 import { Header } from './components/Header';
 import { ActivityBar } from './components/ActivityBar';
@@ -12,6 +12,8 @@ import { AnalysisOverlay } from './components/AnalysisOverlay';
 import { RuleCreatorDialog } from './components/RuleCreatorDialog';
 import { ManualRuleDialog } from './components/ManualRuleDialog';
 import { WorkspacePicker } from './components/WorkspacePicker';
+import { ReportDialog } from './components/ReportDialog';
+import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 
 import { useRules } from './hooks/useRules';
 import { useAnalysis } from './hooks/useAnalysis';
@@ -28,14 +30,21 @@ interface PendingRule {
 export default function App() {
   const [activePanel, setActivePanel] = useState<SidebarPanel>('explorer');
   const [aiView, setAiView] = useState<AIView>('file');
+  const [tabsCollapsed, setTabsCollapsed] = useState(false);
 
   const handleViewChange = useCallback((v: AIView) => {
     setAiView(v);
+  }, []);
+  const handleToggleTabsCollapsed = useCallback(() => {
+    setTabsCollapsed(c => !c);
   }, []);
   const [pendingRule, setPendingRule] = useState<PendingRule | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [pendingCloseTab, setPendingCloseTab] = useState<OpenTab | null>(null);
+  const [saveToast, setSaveToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -49,10 +58,11 @@ export default function App() {
   const {
     resultsByFile, messages, analyzing, progress, stepLabel,
     analyzeFile, analyzeRepository, sendMessage,
+    clearFileResult, clearAllResults, clearMessages,
   } = useAnalysis();
   const {
     workspace, tree, recent, loading: wsLoading, error: wsError, backendOnline,
-    openLocal, cloneGit, closeWorkspace, loadFile, clearError,
+    openLocal, cloneGit, closeWorkspace, loadFile, saveFile, clearError,
   } = useWorkspace();
 
   const activeTab = tabs[activeTabIndex] ?? null;
@@ -82,7 +92,7 @@ export default function App() {
     });
   }, [tabs, workspace, loadFile]);
 
-  const closeFile = useCallback((path: string) => {
+  const forceCloseFile = useCallback((path: string) => {
     setTabs(prev => {
       const idx = prev.findIndex(t => t.path === path);
       if (idx < 0) return prev;
@@ -97,6 +107,36 @@ export default function App() {
     });
   }, []);
 
+  /** Save tab content to disk. Returns null on success or error message on failure. */
+  const saveTab = useCallback(async (path: string): Promise<string | null> => {
+    const tab = tabs.find(t => t.path === path);
+    if (!tab) return 'Файл не найден среди открытых табов';
+    const snapshot = tab.content;
+    const err = await saveFile(path, snapshot);
+    if (err) {
+      setSaveToast({ kind: 'err', text: err });
+      return err;
+    }
+    // Update originalContent. If user kept typing during save, dirty stays based on
+    // comparing current content with the just-saved snapshot.
+    setTabs(prev => prev.map(t =>
+      t.path === path
+        ? { ...t, originalContent: snapshot, dirty: t.content !== snapshot }
+        : t
+    ));
+    setSaveToast({ kind: 'ok', text: `Сохранено: ${tab.name}` });
+    return null;
+  }, [tabs, saveFile]);
+
+  const closeFile = useCallback((path: string) => {
+    const tab = tabs.find(t => t.path === path);
+    if (tab?.dirty) {
+      setPendingCloseTab(tab);
+      return;
+    }
+    forceCloseFile(path);
+  }, [tabs, forceCloseFile]);
+
   const handleContentChange = useCallback((path: string, content: string) => {
     setTabs(prev => prev.map(t => {
       if (t.path !== path) return t;
@@ -104,25 +144,84 @@ export default function App() {
     }));
   }, []);
 
+  // ---- Save keyboard shortcut & navigation guard ----
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (activeTab && activeTab.dirty) saveTab(activeTab.path);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTab, saveTab]);
+
+  useEffect(() => {
+    const hasDirty = tabs.some(t => t.dirty);
+    if (!hasDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [tabs]);
+
+  // Auto-dismiss save toast
+  useEffect(() => {
+    if (!saveToast) return;
+    const t = setTimeout(() => setSaveToast(null), saveToast.kind === 'ok' ? 1500 : 4000);
+    return () => clearTimeout(t);
+  }, [saveToast]);
+
   // ---- Workspace ----
+  const confirmDiscardDirty = useCallback((): boolean => {
+    const dirty = tabs.filter(t => t.dirty);
+    if (dirty.length === 0) return true;
+    const list = dirty.map(t => '• ' + t.path).join('\n');
+    return window.confirm(
+      `Несохранённые изменения в ${dirty.length} файлах:\n\n${list}\n\nПродолжить? Изменения будут потеряны.`
+    );
+  }, [tabs]);
+
   const handleCloseWorkspace = useCallback(async () => {
+    if (!confirmDiscardDirty()) return;
     await closeWorkspace();
     setTabs([]);
     setActiveTabIndex(0);
-  }, [closeWorkspace]);
+  }, [closeWorkspace, confirmDiscardDirty]);
 
-  // After opening a new workspace, close all tabs (they belong to the old project)
   const wrappedOpenLocal = useCallback(async (path: string) => {
+    if (!confirmDiscardDirty()) return false;
     const ok = await openLocal(path);
     if (ok) { setTabs([]); setActiveTabIndex(0); }
     return ok;
-  }, [openLocal]);
+  }, [openLocal, confirmDiscardDirty]);
 
   const wrappedClone = useCallback(async (url: string, target?: string) => {
+    if (!confirmDiscardDirty()) return false;
     const ok = await cloneGit(url, target);
     if (ok) { setTabs([]); setActiveTabIndex(0); }
     return ok;
-  }, [cloneGit]);
+  }, [cloneGit, confirmDiscardDirty]);
+
+  // ---- Unsaved-changes dialog handlers ----
+  const handleDialogSave = useCallback(async (): Promise<string | null> => {
+    if (!pendingCloseTab) return null;
+    const err = await saveTab(pendingCloseTab.path);
+    if (err) return err;
+    forceCloseFile(pendingCloseTab.path);
+    setPendingCloseTab(null);
+    return null;
+  }, [pendingCloseTab, saveTab, forceCloseFile]);
+
+  const handleDialogDiscard = useCallback(() => {
+    if (!pendingCloseTab) return;
+    forceCloseFile(pendingCloseTab.path);
+    setPendingCloseTab(null);
+  }, [pendingCloseTab, forceCloseFile]);
+
+  const handleDialogCancel = useCallback(() => setPendingCloseTab(null), []);
 
   // ---- Analysis ----
   const handleAnalyzeFile = useCallback(() => {
@@ -190,6 +289,51 @@ export default function App() {
     sendMessage(text, context);
   }, [activeTab, sendMessage]);
 
+  // ---- Reset analysis data per active AI view ----
+  const handleResetData = useCallback(() => {
+    switch (aiView) {
+      case 'file': {
+        if (!activeTab) {
+          setSaveToast({ kind: 'err', text: 'Нет активного файла' });
+          return;
+        }
+        if (!(activeTab.path in resultsByFile)) {
+          setSaveToast({ kind: 'err', text: 'Нет данных для сброса' });
+          return;
+        }
+        clearFileResult(activeTab.path);
+        setSaveToast({ kind: 'ok', text: `Результаты для ${activeTab.name} сброшены` });
+        break;
+      }
+      case 'repository': {
+        const count = Object.keys(resultsByFile).length;
+        if (count === 0) {
+          setSaveToast({ kind: 'err', text: 'Нет результатов для сброса' });
+          return;
+        }
+        if (window.confirm(`Удалить результаты анализа всех ${count} файлов?`)) {
+          clearAllResults();
+          setSaveToast({ kind: 'ok', text: 'Все результаты анализа сброшены' });
+        }
+        break;
+      }
+      case 'chat': {
+        if (messages.length <= 1) {
+          setSaveToast({ kind: 'err', text: 'История уже пустая' });
+          return;
+        }
+        if (window.confirm('Очистить историю чата?')) {
+          clearMessages();
+        }
+        break;
+      }
+      case 'commit':
+      case 'pr':
+        setSaveToast({ kind: 'err', text: 'Режим в разработке — нечего сбрасывать' });
+        break;
+    }
+  }, [aiView, activeTab, resultsByFile, messages, clearFileResult, clearAllResults, clearMessages]);
+
   // Auto-open picker on first load when no workspace and backend is online
   // (commented out — let user see empty state instead)
   // useEffect(() => {
@@ -205,7 +349,7 @@ export default function App() {
         analyzing={analyzing}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <ActivityBar
           activePanel={activePanel}
           onSelect={p => setActivePanel(p as SidebarPanel)}
@@ -247,7 +391,29 @@ export default function App() {
           onSendMessage={handleSendMessage}
           onApplyFix={handleApplyFix}
           onJumpToLine={handleJumpToLine}
+          onResetData={handleResetData}
+          tabsCollapsed={tabsCollapsed}
+          onToggleTabsCollapsed={handleToggleTabsCollapsed}
         />
+
+        {/* Floating "Summary report" button — inside main content area */}
+        <button
+          onClick={() => setReportOpen(true)}
+          disabled={Object.keys(resultsByFile).length === 0}
+          className="absolute bottom-24 right-[336px] bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full p-3 shadow-2xl transition-all z-10 flex items-center justify-center"
+          title={
+            Object.keys(resultsByFile).length === 0
+              ? 'Сначала запустите анализ файла или проекта'
+              : `Сводный отчёт (${Object.keys(resultsByFile).length} файлов)`
+          }
+        >
+          <FontAwesomeIcon icon={faChartBar} className="text-lg" />
+          {Object.keys(resultsByFile).length > 0 && (
+            <span className="ml-2 text-[10px] font-bold bg-white/20 px-1.5 rounded">
+              {Object.keys(resultsByFile).length}
+            </span>
+          )}
+        </button>
       </div>
 
       <StatusBar
@@ -299,6 +465,36 @@ export default function App() {
           onSubmit={handleManualSubmit}
           onClose={closeManual}
         />
+      )}
+
+      {reportOpen && (
+        <ReportDialog
+          resultsByFile={resultsByFile}
+          onFileOpen={openFile}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+
+      {pendingCloseTab && (
+        <UnsavedChangesDialog
+          fileName={pendingCloseTab.name}
+          filePath={pendingCloseTab.path}
+          onSave={handleDialogSave}
+          onDiscard={handleDialogDiscard}
+          onCancel={handleDialogCancel}
+        />
+      )}
+
+      {saveToast && (
+        <div
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-xs z-[300] border ${
+            saveToast.kind === 'ok'
+              ? 'bg-green-900/90 border-green-500/50 text-green-300'
+              : 'bg-red-900/90 border-red-500/50 text-red-300'
+          }`}
+        >
+          {saveToast.kind === 'ok' ? '✓ ' : '⚠️ '}{saveToast.text}
+        </div>
       )}
     </div>
   );

@@ -98,9 +98,18 @@ export function useWorkspace() {
     }
   }, []);
 
+  const saveFile = useCallback(async (path: string, content: string): Promise<string | null> => {
+    try {
+      await workspaceApi.saveFile(path, content);
+      return null;
+    } catch (err) {
+      return errMsg(err, 'Не удалось сохранить файл');
+    }
+  }, []);
+
   return {
     workspace, tree, recent, loading, error, backendOnline,
-    openLocal, cloneGit, closeWorkspace, loadFile, refresh,
+    openLocal, cloneGit, closeWorkspace, loadFile, saveFile, refresh,
     clearError: () => setError(null),
   };
 }
