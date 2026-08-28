@@ -18,5 +18,10 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // react-hooks v7: паттерн «загрузка данных в effect» легитимен для этого
+      // проекта (fetch при монтировании); оставляем как предупреждение
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

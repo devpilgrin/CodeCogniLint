@@ -1,5 +1,9 @@
 # CodeCogniLint
 
+[![CI](https://github.com/devpilgrin/CodeCogniLint/actions/workflows/ci.yml/badge.svg)](https://github.com/devpilgrin/CodeCogniLint/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/devpilgrin/CodeCogniLint)](https://github.com/devpilgrin/CodeCogniLint/releases)
+[![License](https://img.shields.io/github/license/devpilgrin/CodeCogniLint)](LICENSE)
+
 Гибридная система анализа кода для веба: статистика Git-истории + семантическое понимание LLM. IDE-подобный интерфейс с редактором Monaco, динамическими правилами и поддержкой как облачных, так и локальных моделей.
 
 ![Скриншот интерфейса CodeCogniLint](image/scren.png)
@@ -29,12 +33,25 @@
 | Стриминг   | Server-Sent Events (`StreamingResponse`)         |
 
 
-## Быстрый старт (Windows)
+## Быстрый старт
 
-Установлены: **Node.js 18+**, **Python 3.11+**, **LM Studio** (для локального LLM) или ключ OpenAI/Anthropic.
+Требования: **Node.js 18+**, **Python 3.11+**, **LM Studio** (для локального LLM) или ключ OpenAI/Anthropic.
+
+### Linux / macOS
+
+```bash
+# Запуск обоих сервисов (зависимости установятся автоматически при первом запуске)
+./start-all.sh
+
+# Или по одному:
+./start-backend.sh    # http://localhost:8000  (API + Swagger на /docs)
+./start-frontend.sh   # http://localhost:3000
+```
+
+### Windows
 
 ```powershell
-# 1. Установить зависимости (один раз)
+# 1. Установить зависимости вручную (один раз, либо доверить скриптам)
 cd frontend
 npm install
 cd ..\backend
@@ -43,16 +60,13 @@ python -m venv .venv
 
 # 2. Запуск обоих сервисов в отдельных окнах
 .\start-all.bat
+
+# Или по одному:
+.\start-backend.bat   # http://localhost:8000
+.\start-frontend.bat  # http://localhost:3000
 ```
 
 Откройте <http://localhost:3000>.
-
-Альтернативно — по одному:
-
-```powershell
-.\start-frontend.bat   # http://localhost:3000
-.\start-backend.bat    # http://localhost:8000  (API + Swagger на /docs)
-```
 
 
 ## Настройка LLM
@@ -192,10 +206,10 @@ CodeCogniLint/
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
 │
-├── start-all.bat                     # запуск обоих сервисов
-├── start-backend.bat
-├── start-frontend.bat
-└── claude.md                         # исходное ТЗ
+├── start-all.sh / .bat                 # запуск обоих сервисов (Linux/macOS / Windows)
+├── start-backend.sh / .bat
+├── start-frontend.sh / .bat
+└── claude.md                           # исходное ТЗ
 ```
 
 
