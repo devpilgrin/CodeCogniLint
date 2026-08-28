@@ -3,6 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
+  ReviewResult, ChangesReviewResult,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -70,4 +71,11 @@ export const gitApi = {
     api.post<GitPullResult>('/git/pull', { token: token || null }).then(r => r.data),
   log: (limit = 10) =>
     api.get<{ commits: GitLogEntry[] }>('/git/log', { params: { limit } }).then(r => r.data.commits),
+};
+
+export const reviewApi = {
+  reviewFile: (filePath: string, content: string) =>
+    api.post<ReviewResult>('/review/file', { file_path: filePath, content }).then(r => r.data),
+  reviewChanges: () =>
+    api.post<ChangesReviewResult>('/review/changes').then(r => r.data),
 };

@@ -4,11 +4,13 @@ import {
   faBrain, faSyncAlt, faExpandAlt, faCompressAlt, faRobot,
   faInfoCircle, faPaperPlane, faCheckCircle,
   faArrowRight, faLightbulb, faComments, faTools,
-  faExclamationTriangle,
+  faExclamationTriangle, faClipboardCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ChatMessage, Violation, AnalysisScope } from '../types';
+import { ReviewTab } from './ReviewTab';
+import type { ReviewMode, ReviewState } from '../hooks/useReview';
 
-export type AIView = AnalysisScope | 'chat';
+export type AIView = AnalysisScope | 'chat' | 'review';
 
 interface Props {
   messages: ChatMessage[];
@@ -21,6 +23,15 @@ interface Props {
   onResetData: () => void;
   tabsCollapsed: boolean;
   onToggleTabsCollapsed: () => void;
+  // Code Review Agent
+  reviewing: ReviewMode | null;
+  reviewState: ReviewState;
+  reviewError: string | null;
+  activeFilePath: string | null;
+  hasWorkspace: boolean;
+  onReviewFile: () => void;
+  onReviewChanges: () => void;
+  onOpenFile: (path: string) => void;
 }
 
 const SCOPE_TABS: { value: AnalysisScope; label: string }[] = [
@@ -60,6 +71,8 @@ export function AIPanel({
   messages, violations, view, onViewChange,
   onSendMessage, onApplyFix, onJumpToLine,
   onResetData, tabsCollapsed, onToggleTabsCollapsed,
+  reviewing, reviewState, reviewError, activeFilePath, hasWorkspace,
+  onReviewFile, onReviewChanges, onOpenFile,
 }: Props) {
   const [input, setInput] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -133,6 +146,18 @@ export function AIPanel({
         ))}
         <div className="w-px bg-[#30363d] self-stretch my-1" />
         <button
+          onClick={() => onViewChange('review')}
+          className={`flex-1 py-1.5 transition-colors ${
+            view === 'review'
+              ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500'
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+          title="Агент код-ревью"
+        >
+          <FontAwesomeIcon icon={faClipboardCheck} className="mr-1" />
+          Ревью
+        </button>
+        <button
           onClick={() => onViewChange('chat')}
           className={`flex-1 py-1.5 transition-colors relative ${
             view === 'chat'
@@ -153,6 +178,20 @@ export function AIPanel({
       {view === 'commit' && <PlaceholderTab title="Анализ коммита" hint="Выбор коммита и сравнение с предыдущим — в разработке" />}
       {view === 'pr' && <PlaceholderTab title="Анализ Pull / Merge Request" hint="Интеграция с GitHub/GitLab API — в разработке" />}
       {view === 'repository' && <PlaceholderTab title="Сканирование репозитория" hint="Полное сканирование с группировкой нарушений — в разработке" />}
+
+      {view === 'review' && (
+        <ReviewTab
+          reviewing={reviewing}
+          state={reviewState}
+          error={reviewError}
+          activeFilePath={activeFilePath}
+          hasWorkspace={hasWorkspace}
+          onReviewFile={onReviewFile}
+          onReviewChanges={onReviewChanges}
+          onJumpToLine={onJumpToLine}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
       {view === 'chat' && (
         <ChatTabContent

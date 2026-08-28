@@ -157,3 +157,31 @@ export interface GitPullResult {
   updated: boolean;
   head: string;
 }
+
+// ---- Code Review Agent ----
+export type ReviewVerdict = 'approve' | 'comment' | 'request_changes';
+
+export interface ReviewIssue {
+  severity: 'critical' | 'warning' | 'info';
+  category: 'bug' | 'security' | 'performance' | 'style' | 'maintainability';
+  line_start: number;
+  line_end: number;
+  code_snippet?: string;
+  title: string;
+  description: string;
+  suggestion: string;
+}
+
+export interface ReviewResult {
+  file_path: string;
+  verdict: ReviewVerdict;
+  summary: string;
+  issues: ReviewIssue[];
+  positives: string[];
+}
+
+export interface ChangesReviewResult {
+  overall_verdict: ReviewVerdict;
+  summary: string;
+  files: ReviewResult[];
+}

@@ -18,6 +18,7 @@ import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import { useRules } from './hooks/useRules';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useWorkspace } from './hooks/useWorkspace';
+import { useReview } from './hooks/useReview';
 import type { OpenTab, Rule, RuleCategory, Violation } from './types';
 
 type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings';
@@ -64,6 +65,10 @@ export default function App() {
     workspace, tree, recent, loading: wsLoading, error: wsError, backendOnline,
     openLocal, cloneGit, closeWorkspace, loadFile, saveFile, clearError,
   } = useWorkspace();
+  const {
+    reviewing, state: reviewState, error: reviewError,
+    runFileReview, runChangesReview, clearReview,
+  } = useReview();
 
   const activeTab = tabs[activeTabIndex] ?? null;
   const violations: Violation[] = activeTab ? (resultsByFile[activeTab.path]?.violations ?? []) : [];
@@ -234,6 +239,17 @@ export default function App() {
     analyzeRepository();
   }, [workspace, analyzeRepository]);
 
+  // ---- Code Review Agent ----
+  const handleReviewFile = useCallback(() => {
+    if (!activeTab) return;
+    runFileReview(activeTab.path, activeTab.content);
+  }, [activeTab, runFileReview]);
+
+  const handleReviewChanges = useCallback(() => {
+    if (!workspace) return;
+    runChangesReview();
+  }, [workspace, runChangesReview]);
+
   // ---- Rule creation ----
   const handleCreateRule = useCallback((code: string, category: RuleCategory) => {
     setPendingRule({ code, category });
@@ -327,12 +343,21 @@ export default function App() {
         }
         break;
       }
+      case 'review': {
+        if (!reviewState.file && !reviewState.changes) {
+          setSaveToast({ kind: 'err', text: 'Нет результатов ревью для сброса' });
+          return;
+        }
+        clearReview();
+        setSaveToast({ kind: 'ok', text: 'Результаты ревью сброшены' });
+        break;
+      }
       case 'commit':
       case 'pr':
         setSaveToast({ kind: 'err', text: 'Режим в разработке — нечего сбрасывать' });
         break;
     }
-  }, [aiView, activeTab, resultsByFile, messages, clearFileResult, clearAllResults, clearMessages]);
+  }, [aiView, activeTab, resultsByFile, messages, reviewState, clearFileResult, clearAllResults, clearMessages, clearReview]);
 
   // Auto-open picker on first load when no workspace and backend is online
   // (commented out — let user see empty state instead)
@@ -394,6 +419,14 @@ export default function App() {
           onResetData={handleResetData}
           tabsCollapsed={tabsCollapsed}
           onToggleTabsCollapsed={handleToggleTabsCollapsed}
+          reviewing={reviewing}
+          reviewState={reviewState}
+          reviewError={reviewError}
+          activeFilePath={activeTab?.path ?? null}
+          hasWorkspace={workspace !== null}
+          onReviewFile={handleReviewFile}
+          onReviewChanges={handleReviewChanges}
+          onOpenFile={openFile}
         />
 
         {/* Floating "Summary report" button — inside main content area */}

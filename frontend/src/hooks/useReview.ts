@@ -1,0 +1,61 @@
+import { useState, useCallback } from 'react';
+import axios from 'axios';
+import { reviewApi } from '../services/api';
+import type { ReviewResult, ChangesReviewResult } from '../types';
+
+export type ReviewMode = 'file' | 'changes';
+
+export interface ReviewState {
+  mode: ReviewMode;
+  file: ReviewResult | null;
+  changes: ChangesReviewResult | null;
+}
+
+function errText(e: unknown): string {
+  if (axios.isAxiosError(e)) {
+    const detail = (e.response?.data as { detail?: string } | undefined)?.detail;
+    if (detail) return detail;
+    if (e.code === 'ERR_NETWORK') return 'Бэкенд не отвечает';
+    return e.message;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
+export function useReview() {
+  const [reviewing, setReviewing] = useState<ReviewMode | null>(null);
+  const [state, setState] = useState<ReviewState>({ mode: 'file', file: null, changes: null });
+  const [error, setError] = useState<string | null>(null);
+
+  const runFileReview = useCallback(async (filePath: string, content: string) => {
+    setReviewing('file');
+    setError(null);
+    try {
+      const result = await reviewApi.reviewFile(filePath, content);
+      setState({ mode: 'file', file: result, changes: null });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setReviewing(null);
+    }
+  }, []);
+
+  const runChangesReview = useCallback(async () => {
+    setReviewing('changes');
+    setError(null);
+    try {
+      const result = await reviewApi.reviewChanges();
+      setState({ mode: 'changes', file: null, changes: result });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setReviewing(null);
+    }
+  }, []);
+
+  const clearReview = useCallback(() => {
+    setState({ mode: 'file', file: null, changes: null });
+    setError(null);
+  }, []);
+
+  return { reviewing, state, error, runFileReview, runChangesReview, clearReview };
+}

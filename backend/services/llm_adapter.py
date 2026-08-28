@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:1234/v1"
     llm_model: str = "local-model"
     llm_api_key: str = "lm-studio"
+    llm_temperature: float = 0.3
     openai_api_key: str = ""
     anthropic_api_key: str = ""
 
@@ -52,13 +53,15 @@ class LLMError(Exception):
         self.original = original
 
 
-async def chat_completion(messages: list[dict], temperature: float = 0.3) -> str:
+async def chat_completion(messages: list[dict], temperature: float | None = None) -> str:
     client = get_client()
+    # temperature=None → из настроек (некоторые модели принимают только temperature=1)
+    temp = settings.llm_temperature if temperature is None else temperature
     try:
         response = await client.chat.completions.create(
             model=settings.llm_model,
             messages=messages,
-            temperature=temperature,
+            temperature=temp,
         )
         return response.choices[0].message.content or ""
     except Exception as exc:

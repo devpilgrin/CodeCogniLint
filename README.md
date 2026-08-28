@@ -14,6 +14,7 @@
 - **IDE-интерфейс** — Monaco Editor, табы файлов, дерево проводника, AI-панель, status bar
 - **Открытие проектов** — локальная папка или клонирование Git-репозитория прямо из UI; список недавних проектов
 - **Git-контур** — сохранение правок на диск (Ctrl+S), панель Git: статус ветки, список изменений, commit / push / pull, история коммитов; push по HTTPS с токеном (не сохраняется в конфиг) или по SSH
+- **Агент код-ревью** — специализированный LLM-ревьюер: вердикт (одобрено / комментарии / требуются правки), замечания с категориями (баг / безопасность / производительность / стиль / поддерживаемость) и привязкой к строкам, сильные стороны кода; режимы: текущий файл и незакоммиченные изменения (git)
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -160,6 +161,8 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/git/push`                   | Push в origin (токен из запроса или .env) |
 | POST  | `/api/git/pull`                   | Pull (--ff-only)                          |
 | GET   | `/api/git/log?limit=...`          | Последние коммиты                         |
+| POST  | `/api/review/file`                | Агент код-ревью: ревью одного файла       |
+| POST  | `/api/review/changes`             | Ревью незакоммиченных изменений (git)     |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -188,10 +191,12 @@ CodeCogniLint/
 │   │   ├── rules.py                  # CRUD правил + /generate (LLM)
 │   │   ├── workspace.py              # open/clone/tree/file/browse + сохранение файла
 │   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log
+│   │   ├── review.py                 # /review: агент код-ревью (file, changes)
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   └── services/
 │       ├── llm_adapter.py            # LLMError + friendly error mapping
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
+│       ├── review_agent.py           # агент код-ревью: вердикт, issues, positives
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
@@ -205,8 +210,9 @@ CodeCogniLint/
 │       │   ├── ActivityBar.tsx
 │       │   ├── Sidebar.tsx           # explorer / git / rules / settings
 │       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
+│       │   ├── ReviewTab.tsx         # агент код-ревью: вердикт, issues, positives
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
-│       │   ├── AIPanel.tsx           # 5 вкладок: scope + Чат
+│       │   ├── AIPanel.tsx           # вкладки: scope + Ревью + Чат
 │       │   ├── FileTree.tsx          # рекурсивное дерево
 │       │   ├── WorkspacePicker.tsx   # local / git clone / recent
 │       │   ├── RuleCreatorDialog.tsx # из выделения (LLM)
@@ -217,6 +223,7 @@ CodeCogniLint/
 │       │   ├── useRules.ts
 │       │   ├── useAnalysis.ts        # одиночный + SSE репо
 │       │   ├── useGit.ts             # статус/commit/push/pull + уведомления
+│       │   ├── useReview.ts          # агент код-ревью (file / changes)
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
@@ -236,6 +243,8 @@ CodeCogniLint/
 - **SSE-стриминг** — `text/event-stream` с `X-Accel-Buffering: no`, авто-стоп после 3 LLM-ошибок подряд
 - **Path traversal** — `target.relative_to(root)` гарантирует, что `/api/workspace/file` не читает за пределами workspace; бинарники режутся по null-byte; лимит 5 МБ для редактора, 256 КБ для пакетного анализа
 - **Git push без утечки токена** — HTTPS-токен подставляется в URL только на время вызова `git push <url>`, в `.git/config` не сохраняется; после push remote-tracking ref и upstream-конфиг обновляются вручную; в ошибках креды маскируются `***`. SSH-remote (`git@...`) работает нативно через ключи ОС
+- **Агент код-ревью** — отдельный промпт-«личность» ревьюера поверх `review_agent.py`: детерминированная нормализация ответа LLM (вердикт, severity, категории обрезаются до допустимых значений), повторное использование snippet-based коррекции номеров строк; режим `changes` берёт изменённые файлы из git status и ревьюит каждый с diff-контекстом
+- **Настраиваемая температура LLM** — `LLM_TEMPERATURE` в `.env` (по умолчанию 0.3): часть моделей (например, reasoning-модели) принимает только `temperature=1`
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -247,6 +256,7 @@ CodeCogniLint/
 - Открытие локального проекта и клонирование Git
 - Сохранение правок на диск (Ctrl+S, атомарная запись, индикатор «dirty»)
 - Git-панель: статус ветки, изменения, commit / push / pull, история
+- Агент код-ревью: вердикт + замечания по строкам + сильные стороны (файл и git-изменения)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)
 
