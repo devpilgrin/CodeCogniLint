@@ -108,3 +108,52 @@ export interface LLMSettings {
   model: string;
   apiKey?: string;
 }
+
+// ---- Git ----
+export interface GitChangedFile {
+  path: string;
+  status: 'M' | 'A' | 'D' | 'R' | '?';
+  staged: boolean;
+}
+
+export interface GitRemote {
+  name: string;
+  url: string;
+}
+
+export interface GitStatus {
+  is_repo: boolean;
+  branch: string | null;
+  head: string | null;
+  tracking: string | null;
+  ahead: number;
+  behind: number;
+  changed: GitChangedFile[];
+  clean: boolean;
+  remotes: GitRemote[];
+}
+
+export interface GitLogEntry {
+  hash: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+export interface GitCommitResult {
+  hash: string;
+  message: string;
+  note: string | null;
+}
+
+export interface GitPushResult {
+  branch: string;
+  remote: string;
+  set_upstream: boolean;
+  auth: 'token' | 'default';
+}
+
+export interface GitPullResult {
+  updated: boolean;
+  head: string;
+}

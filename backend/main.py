@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import rules, analysis, settings, workspace, reports
+from routers import rules, analysis, settings, workspace, reports, gitops
 
 app = FastAPI(title="CodeCogniLint API", version="1.0.0")
 
@@ -17,6 +17,7 @@ app.include_router(analysis.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(workspace.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(gitops.router, prefix="/api")
 
 
 @app.get("/api/health")

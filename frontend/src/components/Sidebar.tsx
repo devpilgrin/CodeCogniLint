@@ -7,6 +7,7 @@ import {
 import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
+import { GitPanel } from './GitPanel';
 
 interface Props {
   panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings';
@@ -218,6 +219,10 @@ export function Sidebar(props: Props) {
 
   if (panel === 'settings') {
     return <SettingsPanel />;
+  }
+
+  if (panel === 'git') {
+    return <GitPanel workspace={workspace} onFileOpen={onFileOpen} />;
   }
 
   // Explorer panel

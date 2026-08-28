@@ -13,6 +13,7 @@
 
 - **IDE-интерфейс** — Monaco Editor, табы файлов, дерево проводника, AI-панель, status bar
 - **Открытие проектов** — локальная папка или клонирование Git-репозитория прямо из UI; список недавних проектов
+- **Git-контур** — сохранение правок на диск (Ctrl+S), панель Git: статус ветки, список изменений, commit / push / pull, история коммитов; push по HTTPS с токеном (не сохраняется в конфиг) или по SSH
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -90,6 +91,9 @@ LLM_API_KEY=lm-studio
 # Для облачных провайдеров:
 # OPENAI_API_KEY=sk-...
 # ANTHROPIC_API_KEY=sk-ant-...
+
+# Токен для git push/pull по HTTPS (GitHub PAT; для SSH-remote не нужен):
+# GIT_TOKEN=ghp_...
 ```
 
 
@@ -148,7 +152,14 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/workspace/close`            | Закрыть текущий проект                    |
 | GET   | `/api/workspace/tree`             | Дерево файлов (skip `.git`, `node_modules`, …) |
 | GET   | `/api/workspace/file?path=...`    | Контент файла (с защитой от path traversal) |
+| PUT   | `/api/workspace/file`             | Сохранить файл на диск (атомарная запись) |
 | GET   | `/api/workspace/browse?path=...`  | Серверный пикер директорий                |
+| GET   | `/api/git/status`                 | Ветка, ahead/behind, список изменений     |
+| GET   | `/api/git/diff?path=...`          | Unified diff (файл или весь проект)       |
+| POST  | `/api/git/commit`                 | Коммит (все изменения или выбранные пути) |
+| POST  | `/api/git/push`                   | Push в origin (токен из запроса или .env) |
+| POST  | `/api/git/pull`                   | Pull (--ff-only)                          |
+| GET   | `/api/git/log?limit=...`          | Последние коммиты                         |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -175,13 +186,15 @@ CodeCogniLint/
 │   ├── routers/
 │   │   ├── analysis.py               # /file, /repository/stream, /chat
 │   │   ├── rules.py                  # CRUD правил + /generate (LLM)
-│   │   ├── workspace.py              # open/clone/tree/file/browse
+│   │   ├── workspace.py              # open/clone/tree/file/browse + сохранение файла
+│   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   └── services/
 │       ├── llm_adapter.py            # LLMError + friendly error mapping
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
 │       ├── rules_service.py          # load/save/add/update/delete
-│       └── workspace_service.py      # обход дерева, чтение, git clone
+│       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
+│       └── workspace_service.py      # обход дерева, чтение, запись, git clone
 │
 ├── frontend/
 │   ├── vite.config.ts                # прокси /api → :8000
@@ -190,7 +203,8 @@ CodeCogniLint/
 │       ├── components/
 │       │   ├── Header.tsx
 │       │   ├── ActivityBar.tsx
-│       │   ├── Sidebar.tsx           # explorer / rules / settings
+│       │   ├── Sidebar.tsx           # explorer / git / rules / settings
+│       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
 │       │   ├── AIPanel.tsx           # 5 вкладок: scope + Чат
 │       │   ├── FileTree.tsx          # рекурсивное дерево
@@ -202,6 +216,7 @@ CodeCogniLint/
 │       ├── hooks/
 │       │   ├── useRules.ts
 │       │   ├── useAnalysis.ts        # одиночный + SSE репо
+│       │   ├── useGit.ts             # статус/commit/push/pull + уведомления
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
@@ -220,6 +235,7 @@ CodeCogniLint/
 - **Нормализация истории чата** — для строгих jinja-шаблонов (Llama, Qwen) убираются дубль-system, orphan-assistant в начале, склеиваются подряд идущие сообщения одной роли
 - **SSE-стриминг** — `text/event-stream` с `X-Accel-Buffering: no`, авто-стоп после 3 LLM-ошибок подряд
 - **Path traversal** — `target.relative_to(root)` гарантирует, что `/api/workspace/file` не читает за пределами workspace; бинарники режутся по null-byte; лимит 5 МБ для редактора, 256 КБ для пакетного анализа
+- **Git push без утечки токена** — HTTPS-токен подставляется в URL только на время вызова `git push <url>`, в `.git/config` не сохраняется; после push remote-tracking ref и upstream-конфиг обновляются вручную; в ошибках креды маскируются `***`. SSH-remote (`git@...`) работает нативно через ключи ОС
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -229,6 +245,8 @@ CodeCogniLint/
 - Анализ файла и всего проекта
 - Создание/редактирование/удаление/переключение правил
 - Открытие локального проекта и клонирование Git
+- Сохранение правок на диск (Ctrl+S, атомарная запись, индикатор «dirty»)
+- Git-панель: статус ветки, изменения, commit / push / pull, история
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)
 
@@ -236,4 +254,3 @@ CodeCogniLint/
 - Анализ конкретного коммита (`git diff` + LLM-комментарии)
 - Анализ Pull / Merge Request (интеграция с GitHub/GitLab API)
 - Сравнение нарушений между ветками
-- Сохранение отредактированного контента на диск (сейчас изменения только в памяти; индикатор «dirty» уже есть)

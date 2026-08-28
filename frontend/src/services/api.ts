@@ -2,6 +2,7 @@ import axios from 'axios';
 import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
+  GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -55,4 +56,18 @@ export const workspaceApi = {
     ).then(r => r.data),
   browse: (path?: string) =>
     api.get<BrowseResponse>('/workspace/browse', { params: path ? { path } : {} }).then(r => r.data),
+};
+
+export const gitApi = {
+  status: () => api.get<GitStatus>('/git/status').then(r => r.data),
+  diff: (path?: string) =>
+    api.get<{ path: string | null; diff: string }>('/git/diff', { params: path ? { path } : {} }).then(r => r.data),
+  commit: (message: string, paths?: string[]) =>
+    api.post<GitCommitResult>('/git/commit', { message, paths: paths ?? null }).then(r => r.data),
+  push: (token?: string) =>
+    api.post<GitPushResult>('/git/push', { token: token || null }).then(r => r.data),
+  pull: (token?: string) =>
+    api.post<GitPullResult>('/git/pull', { token: token || null }).then(r => r.data),
+  log: (limit = 10) =>
+    api.get<{ commits: GitLogEntry[] }>('/git/log', { params: { limit } }).then(r => r.data.commits),
 };
