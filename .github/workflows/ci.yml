@@ -100,3 +100,20 @@ jobs:
         working-directory: frontend
         continue-on-error: true
         run: npm audit --omit=dev
+
+  quality:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Ratchet-гейт: бюджеты качества из .ccl-quality.yml; регресс роняет CI
+      - name: Quality gate
+        run: |
+          pip install -r backend/requirements.txt
+          python backend/quality_gate.py .

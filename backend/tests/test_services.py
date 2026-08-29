@@ -137,3 +137,38 @@ def test_pentest_headers_helper():
     ok = _check_headers({"x-content-type-options": "nosniff", "x-frame-options": "DENY",
                          "content-security-policy": "default-src 'self'"}, "http")
     assert not ok
+
+
+# ------------------------------------------------------------------ гейт качества
+
+def test_gate_config_defaults_without_file(tmp_path):
+    cfg = qs.load_gate_config(str(tmp_path))
+    assert cfg["thresholds"]["func_cc"] == 10
+    assert cfg["budgets"] == {}
+
+
+def test_gate_config_reads_budgets(tmp_path):
+    (tmp_path / ".ccl-quality.yml").write_text(
+        "func_cc: 15\nmax_findings_total: 5\nmax_complex_functions: 2\n", encoding="utf-8")
+    cfg = qs.load_gate_config(str(tmp_path))
+    assert cfg["thresholds"]["func_cc"] == 15
+    assert cfg["budgets"] == {"max_findings_total": 5, "max_complex_functions": 2}
+
+
+def _gate_report(n_findings: int, complex_n: int) -> dict:
+    return {
+        "findings": [{"category": "performance", "severity": "warning"} for _ in range(n_findings)]
+                    + [{"category": "x", "severity": "info", "suppressed": True}],  # не считается
+        "metrics": {"complex_functions": [{}] * complex_n,
+                    "long_functions": [], "big_files": []},
+    }
+
+
+def test_gate_ratchet():
+    cfg = {"budgets": {"max_findings_total": 2, "max_complex_functions": 1}}
+    assert qs.evaluate_gate(_gate_report(2, 1), cfg) == []          # ровно бюджет — pass
+    v = qs.evaluate_gate(_gate_report(3, 1), cfg)
+    assert len(v) == 1 and "находок качества" in v[0]              # регресс находок
+    v = qs.evaluate_gate(_gate_report(2, 2), cfg)
+    assert len(v) == 1 and "сложных функций" in v[0]               # регресс CC
+    assert qs.evaluate_gate(_gate_report(99, 99), {"budgets": {}}) == []  # без бюджетов — pass

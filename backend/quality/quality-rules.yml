@@ -163,12 +163,8 @@ rules:
       - pattern-regex: "(?i)(#|//)\\s*(TODO|FIXME|HACK|XXX)\\b"
 
   # ============ BEST PRACTICES (JS/TS) ============
-  - id: bp-js-var
-    languages: [typescript, javascript]
-    severity: WARNING
-    message: var имеет функциональную область видимости и hoisting — используйте const/let
-    metadata: {category: best-practices}
-    pattern: "var $X = ..."
+  # NB: правило `var` исключено — semgrep в TS-режиме ловит ложные
+  # срабатывания на обычном тексте; для JS правильный инструмент — eslint no-var
 
   - id: bp-js-double-equals
     languages: [typescript, javascript]

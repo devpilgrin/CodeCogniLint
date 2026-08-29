@@ -24,10 +24,42 @@ from services.llm_adapter import chat_completion, LLMError
 
 QUALITY_RULES = Path(__file__).parent.parent / "quality" / "quality-rules.yml"
 
-# Пороги размера/сложности (бест-практики по умолчанию)
-MAX_FILE_LOC = 400          # файл длиннее — кандидат на декомпозицию
-MAX_FUNC_LOC = 60           # функция длиннее — слишком много ответственности
-MAX_FUNC_CC = 10            # цикломатическая сложность выше — тяжело тестировать
+# Пороги размера/сложности по умолчанию (переопределяются .ccl-quality.yml
+# в корне сканируемого проекта)
+DEFAULT_THRESHOLDS = {"file_loc": 400, "func_loc": 60, "func_cc": 10}
+
+GATE_CONFIG_FILE = ".ccl-quality.yml"
+
+
+def load_gate_config(workspace: str) -> dict:
+    """Конфиг гейта качества из корня проекта (все ключи опциональны).
+
+    Пороги: file_loc, func_loc, func_cc — метрики-нарушения.
+    Бюджеты (ratchet): max_findings_total, max_perf_findings,
+    max_bp_findings, max_complex_functions, max_long_functions,
+    max_big_files — текущие допустимые значения; превышение = регресс."""
+    cfg = {
+        "thresholds": dict(DEFAULT_THRESHOLDS),
+        "budgets": {},  # пусто = гейт не проверяет
+    }
+    path = Path(workspace) / GATE_CONFIG_FILE
+    if not path.exists():
+        return cfg
+    import yaml
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return cfg
+    for k in DEFAULT_THRESHOLDS:
+        if isinstance(raw.get(k), int):
+            cfg["thresholds"][k] = raw[k]
+    for k in ("max_findings_total", "max_perf_findings", "max_bp_findings",
+              "max_complex_functions", "max_long_functions", "max_big_files"):
+        if isinstance(raw.get(k), int):
+            cfg["budgets"][k] = raw[k]
+    return cfg
+
+
 MAX_FILE_BYTES = 256 * 1024
 
 _CODE_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".rb", ".php",
@@ -123,8 +155,9 @@ def _func_lengths_python(path: Path, lines: list[str]) -> list[dict]:
     return funcs
 
 
-def collect_metrics(workspace: str) -> dict:
+def collect_metrics(workspace: str, thresholds: Optional[dict] = None) -> dict:
     """Размер кода: LOC по файлам, длина функций, цикломатическая сложность (radon)."""
+    thresholds = thresholds or DEFAULT_THRESHOLDS
     root = Path(workspace)
     files = []
     total_loc = total_code_files = 0
@@ -147,13 +180,13 @@ def collect_metrics(workspace: str) -> dict:
 
         if p.suffix == ".py":
             for f in _func_lengths_python(p, lines):
-                if f["loc"] > MAX_FUNC_LOC:
+                if f["loc"] > thresholds["func_loc"]:
                     long_functions.append({"file": rel, **f})
             if _radon_available():
                 try:
                     from radon.complexity import cc_visit
                     for block in cc_visit(text):
-                        if block.complexity > MAX_FUNC_CC:
+                        if block.complexity > thresholds["func_cc"]:
                             complex_functions.append({
                                 "file": rel, "name": block.name,
                                 "line": block.lineno, "cc": block.complexity,
@@ -162,17 +195,16 @@ def collect_metrics(workspace: str) -> dict:
                     pass  # битый файл — метрики не критичны
 
     files.sort(key=lambda x: -x["loc"])
-    big_files = [f for f in files if f["loc"] > MAX_FILE_LOC]
+    big_files = [f for f in files if f["loc"] > thresholds["file_loc"]]
 
     return {
         "total_code_files": total_code_files,
         "total_loc": total_loc,
-        "big_files": big_files,                      # loc > MAX_FILE_LOC
+        "big_files": big_files,                      # loc > порог file_loc
         "long_functions": sorted(long_functions, key=lambda x: -x["loc"])[:20],
         "complex_functions": sorted(complex_functions, key=lambda x: -x["cc"])[:20],
         "top_files": files[:10],
-        "thresholds": {"file_loc": MAX_FILE_LOC, "func_loc": MAX_FUNC_LOC,
-                       "func_cc": MAX_FUNC_CC},
+        "thresholds": dict(thresholds),
     }
 
 
@@ -235,10 +267,11 @@ async def _review_hotspots(workspace: str, hotspots: list[dict], metrics: dict) 
 # ---------- Точка входа ----------
 
 async def scan_quality(workspace: str, review: bool = False) -> dict:
+    gate_cfg = load_gate_config(workspace)
     rules = await asyncio.to_thread(scan_quality_rules, workspace)
     findings = rules["findings"]
     findings = _apply_suppression(workspace, findings)  # ccl:ignore работает и здесь
-    metrics = await asyncio.to_thread(collect_metrics, workspace)
+    metrics = await asyncio.to_thread(collect_metrics, workspace, gate_cfg["thresholds"])
     hotspots = _rank_hotspots(metrics, findings)
     reviewed = await _review_hotspots(workspace, hotspots, metrics) if review and hotspots else None
 
@@ -274,3 +307,40 @@ def _by_severity(findings: list[dict]) -> dict:
         sev = f.get("severity", "info")
         out[sev] = out.get(sev, 0) + 1
     return out
+
+
+# ---------- Гейт качества (CI): ratchet-бюджеты ----------
+
+def evaluate_gate(report: dict, config: dict) -> list[str]:
+    """Проверка бюджетов качества. Возвращает список нарушений (пусто = pass).
+
+    Ratchet: бюджеты фиксируют текущее состояние; любой регресс (счётчик
+    выше бюджета) роняет гейт. Подавленные находки (ccl:ignore) не считаются."""
+    budgets = config.get("budgets") or {}
+    if not budgets:
+        return []
+    violations: list[str] = []
+    active = [f for f in report["findings"] if not f.get("suppressed")]
+    m = report["metrics"]
+
+    actuals = {
+        "max_findings_total": len(active),
+        "max_perf_findings": sum(1 for f in active if f.get("category") == "performance"),
+        "max_bp_findings": sum(1 for f in active if f.get("category") == "best-practices"),
+        "max_complex_functions": len(m["complex_functions"]),
+        "max_long_functions": len(m["long_functions"]),
+        "max_big_files": len(m["big_files"]),
+    }
+    labels = {
+        "max_findings_total": "находок качества",
+        "max_perf_findings": "находок производительности",
+        "max_bp_findings": "находок best practices",
+        "max_complex_functions": "сложных функций (CC)",
+        "max_long_functions": "длинных функций",
+        "max_big_files": "больших файлов",
+    }
+    for key, limit in budgets.items():
+        actual = actuals.get(key)
+        if actual is not None and actual > limit:
+            violations.append(f"{labels[key]}: {actual} > бюджет {limit}")
+    return violations

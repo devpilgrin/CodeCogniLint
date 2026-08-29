@@ -1,0 +1,15 @@
+# Гейт качества CodeCogniLint (ratchet): бюджеты = текущее состояние на v0.11.x.
+# Любое превышение роняет CI-джобу quality-gate. Улучшил код — уменьши бюджет.
+
+# Пороги метрик (превышение попадает в отчёт metrics)
+file_loc: 400        # LOC на файл
+func_loc: 60         # строк на функцию
+func_cc: 10          # цикломатическая сложность функции
+
+# Бюджеты (текущее состояние; снижать по мере разбора долга)
+max_findings_total: 36
+max_perf_findings: 24
+max_bp_findings: 12
+max_complex_functions: 20
+max_long_functions: 3
+max_big_files: 2
