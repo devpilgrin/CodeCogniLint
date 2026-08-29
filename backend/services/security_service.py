@@ -444,9 +444,10 @@ def collect_coverage(workspace: str, sast_scanned: int) -> dict:
 
 def _fingerprint(f: dict) -> str:
     """Стабильный ID находки: правило + путь + заголовок (без номера строки —
-    переживает сдвиг строк при правках)."""
+    переживает сдвиг строк при правках). Не security-контекст — но sha256,
+    чтобы не триггерить собственный гейт (поймано dogfooding'ом в CI)."""
     raw = f"{f['rule_id']}|{f['path']}|{f['title']}"
-    return hashlib.sha1(raw.encode()).hexdigest()[:16]
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _load_baselines() -> dict:
