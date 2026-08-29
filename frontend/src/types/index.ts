@@ -246,6 +246,52 @@ export interface PentestReport {
   findings: PentestFinding[];
 }
 
+// ---- Мульти-агентный аудит (волна 4) ----
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
+export type Exploitability = 'high' | 'medium' | 'low' | 'unknown';
+
+export interface AuditDomainFinding {
+  rule: string;
+  file: string;
+  exploitability: Exploitability;
+  real: boolean;
+  note: string;
+}
+
+export interface AuditDomain {
+  domain: string;
+  label: string;
+  findings_count: number;
+  risk: RiskLevel;
+  assessment: string;
+  findings: AuditDomainFinding[];
+  recommendations: string[];
+  agent_error: string | null;
+}
+
+export interface AuditMatrixRow {
+  cwe: string;
+  count: number;
+  max_severity: 'critical' | 'warning' | 'info';
+  exploitability: Exploitability;
+}
+
+export interface AuditReport {
+  workspace: string;
+  tools: Record<string, boolean>;
+  summary: SecurityReport['summary'];
+  coverage: SecurityReport['coverage'];
+  domains: AuditDomain[];
+  synthesis: {
+    overall_risk: RiskLevel;
+    verdict: string;
+    attack_vectors: string[];
+    priorities: string[];
+  } | null;
+  matrix: AuditMatrixRow[];
+  note: string | null;
+}
+
 export interface SecurityReport {
   tools: Record<string, boolean>;
   layers: { semgrep: SecurityLayerInfo; secrets: SecurityLayerInfo; sca: SecurityLayerInfo };

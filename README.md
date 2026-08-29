@@ -18,6 +18,7 @@
 - **Security-скан (SAST/SCA)** — детерминированный слой: Semgrep с вендоренными правилами (CWE/OWASP-метаданные, офлайн), поиск секретов (gitleaks или встроенные regex), уязвимости зависимостей (pip-audit / npm audit); опциональный второй проход — LLM-верификатор подтверждает/опровергает находки
 - **Дисциплина анализа** — suppression-комментарии `# ccl:ignore [rule]`, baseline/diff находок между сканами (новые / исправленные), метрики покрытия (сколько файлов реально проанализировано), экспорт SARIF 2.1.0 для GitHub Code Scanning; security-gate в CI (semgrep --error + pip-audit)
 - **Пентест-контур (DAST)** — проверки живого приложения по URL: security-заголовки, CORS (отражение Origin, `*`+credentials), TRACE, открытые .env/.git/docs; фаззинг API по OpenAPI (schemathesis, junit-парсинг отчёта); nuclei при наличии; опциональная LLM-интерпретация (уровень риска + приоритизированные рекомендации)
+- **Мульти-агентный аудит** — находки группируются по доменам (инъекции / аутентификация и секреты / криптография / конфигурация / зависимости), каждый разбирает свой суб-агент с экспертным промптом и контекстом кода; синтезатор выносит итоговый вердикт с векторами атаки и приоритетами; матрица рисков CWE × тяжесть × эксплуатируемость
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -172,6 +173,7 @@ LLM_API_KEY=lm-studio
 | GET/POST/DELETE | `/api/security/baseline` | Baseline находок: инфо / сохранить / удалить |
 | GET   | `/api/pentest/tools`              | Доступность DAST-инструментов             |
 | POST  | `/api/pentest/scan`               | Пентест живого приложения (config/fuzz/nuclei + LLM-интерпретация) |
+| POST  | `/api/audit/run?verify=`          | Мульти-агентный аудит (домены + синтезатор + матрица рисков) |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -203,6 +205,7 @@ CodeCogniLint/
 │   │   ├── review.py                 # /review: агент код-ревью (file, changes)
 │   │   ├── security.py               # /security: tools + scan + sarif + baseline
 │   │   ├── pentest.py                # /pentest: DAST по URL (config/fuzz/nuclei)
+│   │   ├── audit.py                  # /audit: мульти-агентный аудит
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   ├── security/
 │   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
@@ -212,6 +215,7 @@ CodeCogniLint/
 │       ├── review_agent.py           # агент код-ревью: вердикт, issues, positives
 │       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор + baseline/sarif
 │       ├── pentest_service.py        # DAST: config-checks, schemathesis, nuclei, LLM-интерпретация
+│       ├── audit_agent.py            # оркестратор аудита: домены, суб-агенты, синтезатор
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
@@ -225,8 +229,9 @@ CodeCogniLint/
 │       │   ├── ActivityBar.tsx
 │       │   ├── Sidebar.tsx           # explorer / git / security / rules / settings
 │       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
-│       │   ├── SecurityPanel.tsx     # security-скан + пентест (переключатель SAST/DAST)
+│       │   ├── SecurityPanel.tsx     # security-скан + пентест + аудит (переключатель)
 │       │   ├── PentestView.tsx       # DAST: цель, слои, риск, рекомендации
+│       │   ├── AuditView.tsx         # аудит: вердикт, домены, матрица рисков
 │       │   ├── ReviewTab.tsx         # агент код-ревью: вердикт, issues, positives
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
 │       │   ├── AIPanel.tsx           # вкладки: scope + Ревью + Чат
@@ -243,6 +248,7 @@ CodeCogniLint/
 │       │   ├── useReview.ts          # агент код-ревью (file / changes)
 │       │   ├── useSecurity.ts        # security-скан + статус инструментов
 │       │   ├── usePentest.ts         # DAST-скан цели по URL
+│       │   ├── useAudit.ts           # мульти-агентный аудит
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
@@ -270,6 +276,7 @@ CodeCogniLint/
 - **Baseline/diff** — fingerprint находки = sha256(правило + путь + заголовок), переживает сдвиг строк; скан при сохранённом baseline помечает `NEW` и считает исправленные
 - **Security-gate в CI** — semgrep с вендоренными правилами роняет сборку на любой находке; pip-audit по `requirements.txt` без исключений (зависимости держатся на версиях без известных CVE); npm audit — совещательно
 - **DAST-пентест** — встроенные config-checks (заголовки/CORS/TRACE/.env/.git) без зависимостей; фаззинг API через schemathesis по `/openapi.json` с junit-парсингом; nuclei — feature-detect. Синхронные HTTP и CLI вынесены в потоки (`asyncio.to_thread`), иначе самосканирование блокирует event loop
+- **Мульти-агентный аудит** — LLM работают только поверх детерминированных находок: группировка по CWE/инструменту в домены, параллельные суб-агенты с экспертными промптами (`asyncio.gather`), синтезатор-верификатор; без находок LLM не вызывается вовсе
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -285,6 +292,7 @@ CodeCogniLint/
 - Security-скан: Semgrep (CWE/OWASP), секреты, уязвимые зависимости + LLM-верификация
 - Suppression `# ccl:ignore`, baseline/diff находок, метрики покрытия, SARIF-экспорт
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
+- Мульти-агентный аудит: суб-агенты по доменам + синтезатор + матрица рисков (CWE)
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

@@ -3,7 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport,
+  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -100,4 +100,9 @@ export const pentestApi = {
     api.post<PentestReport>('/pentest/scan', {
       url, fuzz, config_checks: configChecks, interpret,
     }).then(r => r.data),
+};
+
+export const auditApi = {
+  run: (verify: boolean) =>
+    api.post<AuditReport>('/audit/run', null, { params: { verify } }).then(r => r.data),
 };

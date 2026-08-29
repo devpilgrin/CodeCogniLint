@@ -4,7 +4,7 @@ import {
   faDatabase, faFolderOpen,
   faXmark, faTriangleExclamation, faPlus, faPencil, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo, PentestReport } from '../types';
+import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
@@ -44,6 +44,11 @@ interface Props {
   pentestError: string | null;
   onPentestLoadTools: () => void;
   onPentestScan: (url: string, fuzz: boolean, configChecks: boolean, interpret: boolean) => void;
+  // Мульти-агентный аудит
+  auditReport: AuditReport | null;
+  auditRunning: boolean;
+  auditError: string | null;
+  onAuditRun: (verify: boolean) => void;
 }
 
 const categoryColor: Record<string, string> = {
@@ -266,6 +271,10 @@ export function Sidebar(props: Props) {
         pentestError={props.pentestError}
         onPentestLoadTools={props.onPentestLoadTools}
         onPentestScan={props.onPentestScan}
+        auditReport={props.auditReport}
+        auditRunning={props.auditRunning}
+        auditError={props.auditError}
+        onAuditRun={props.onAuditRun}
       />
     );
   }

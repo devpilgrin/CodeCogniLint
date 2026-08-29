@@ -21,6 +21,7 @@ import { useWorkspace } from './hooks/useWorkspace';
 import { useReview } from './hooks/useReview';
 import { useSecurity } from './hooks/useSecurity';
 import { usePentest } from './hooks/usePentest';
+import { useAudit } from './hooks/useAudit';
 import type { OpenTab, Rule, RuleCategory, Violation } from './types';
 
 type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
@@ -82,6 +83,9 @@ export default function App() {
     scanning: pentestScanning, error: pentestError,
     loadTools: loadPentestTools, runScan: runPentestScan,
   } = usePentest();
+  const {
+    report: auditReport, running: auditRunning, error: auditError, run: runAudit,
+  } = useAudit(workspace?.path ?? null);
 
   const activeTab = tabs[activeTabIndex] ?? null;
   const violations: Violation[] = activeTab ? (resultsByFile[activeTab.path]?.violations ?? []) : [];
@@ -438,6 +442,10 @@ export default function App() {
           pentestError={pentestError}
           onPentestLoadTools={loadPentestTools}
           onPentestScan={runPentestScan}
+          auditReport={auditReport}
+          auditRunning={auditRunning}
+          auditError={auditError}
+          onAuditRun={runAudit}
         />
 
         <EditorPane

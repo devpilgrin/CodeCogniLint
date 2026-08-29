@@ -5,8 +5,9 @@ import {
   faCheckCircle, faCircleQuestion, faXmark, faBookmark, faFileExport,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { SecurityFinding, SecurityReport, SecurityBaselineInfo, PentestReport } from '../types';
+import type { SecurityFinding, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport } from '../types';
 import { PentestView } from './PentestView';
+import { AuditView } from './AuditView';
 
 interface Props {
   hasWorkspace: boolean;
@@ -28,6 +29,11 @@ interface Props {
   pentestError: string | null;
   onPentestLoadTools: () => void;
   onPentestScan: (url: string, fuzz: boolean, configChecks: boolean, interpret: boolean) => void;
+  // Мульти-агентный аудит
+  auditReport: AuditReport | null;
+  auditRunning: boolean;
+  auditError: string | null;
+  onAuditRun: (verify: boolean) => void;
 }
 
 const sevBadge: Record<SecurityFinding['severity'], string> = {
@@ -62,12 +68,15 @@ const TOOL_NAMES: [string, string][] = [
 
 export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning, busyBaseline, error,
   onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding,
-  pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan }: Props) {
+  pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan,
+  auditReport, auditRunning, auditError, onAuditRun }: Props) {
   const [verify, setVerify] = useState(true);
-  const [view, setView] = useState<'code' | 'pentest'>('code');
+  const [view, setView] = useState<'code' | 'pentest' | 'audit'>('code');
 
   // Пентест не требует открытого workspace — цель задаётся URL
   const pentestMode = view === 'pentest';
+  const auditMode = view === 'audit';
+  const codeMode = view === 'code';
 
   return (
     <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
@@ -75,22 +84,40 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
         Безопасность
       </div>
 
-      {/* Переключатель SAST / DAST */}
+      {/* Переключатель SAST / DAST / Аудит */}
       <div className="flex mx-3 mb-2 rounded overflow-hidden border border-[#30363d] text-[10px] font-semibold flex-shrink-0">
         <button
           onClick={() => setView('code')}
-          className={`flex-1 py-1 transition-colors ${view === 'code' ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
+          className={`flex-1 py-1 transition-colors ${codeMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Скан кода
+          Скан
         </button>
         <button
           onClick={() => setView('pentest')}
-          className={`flex-1 py-1 transition-colors ${view === 'pentest' ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
+          className={`flex-1 py-1 transition-colors ${pentestMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
           title="Пентест работающего приложения"
         >
           Пентест
         </button>
+        <button
+          onClick={() => setView('audit')}
+          className={`flex-1 py-1 transition-colors ${auditMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
+          title="Мульти-агентный аудит: суб-агенты по доменам + синтезатор"
+        >
+          Аудит
+        </button>
       </div>
+
+      {auditMode && (
+        <AuditView
+          hasWorkspace={hasWorkspace}
+          report={auditReport}
+          running={auditRunning}
+          error={auditError}
+          onRun={onAuditRun}
+          onOpenFile={(path) => onOpenFinding(path, 1)}
+        />
+      )}
 
       {pentestMode && (
         <PentestView
@@ -103,14 +130,14 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
         />
       )}
 
-      {!pentestMode && !hasWorkspace && (
+      {!pentestMode && !auditMode && !hasWorkspace && (
         <div className="p-4 text-center">
           <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
           <p className="text-xs text-gray-500">Откройте проект,<br />чтобы запустить сканирование</p>
         </div>
       )}
 
-      {!pentestMode && hasWorkspace && (
+      {!pentestMode && !auditMode && hasWorkspace && (
         <>
           {/* Tools availability */}
           {tools && (
