@@ -6,20 +6,23 @@
 Все слои деградируют независимо: если инструмента нет — слой возвращает
 status "unavailable", отчёт собирается из доступных.
 """
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from .llm_adapter import chat_completion, LLMError
-from .workspace_service import SKIP_DIRS
+from .workspace_service import SKIP_DIRS, EXT_TO_LANG
 
 BACKEND_DIR = Path(__file__).parent.parent
 SEMGREP_RULES = BACKEND_DIR / "security" / "semgrep-rules.yml"
+BASELINES_FILE = BACKEND_DIR / ".hybrid-security-baselines.json"
 
 SCAN_TIMEOUT = 120          # секунд на один инструмент
 MAX_FILES_FOR_SECRETS = 500
@@ -40,6 +43,10 @@ SECRET_PATTERNS: list[tuple[str, str, str]] = [
     ("generic-secret", "CWE-798",
      r"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*[\"'][^\"'\s]{8,}[\"']"),
 ]
+
+# Suppression: строка с "# ccl:ignore" (опц. с rule_id или CWE) на строке находки
+# или строкой выше. Пример: password = "x"  # ccl:ignore py-hardcoded-password
+SUPPRESSION_RE = re.compile(r"ccl:ignore(?:[:\s]+([\w\-\./]+))?", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------- инструменты
@@ -129,7 +136,8 @@ def scan_semgrep(workspace: str) -> dict:
             cwe=meta.get("cwe"),
             owasp=meta.get("owasp"),
         ))
-    return {"status": "ok", "findings": findings}
+    return {"status": "ok", "findings": findings,
+            "scanned": len(data.get("paths", {}).get("scanned", []))}
 
 
 # ------------------------------------------------------------------ Секреты
@@ -357,39 +365,264 @@ async def verify_findings(workspace: str, findings: list[dict]) -> list[dict]:
 
 # -------------------------------------------------------------------- Отчёт
 
+# -------------------------------------------------------------- Suppression
+
+def _apply_suppression(workspace: str, findings: list[dict]) -> list[dict]:
+    """Пометить finding['suppressed']=True, если на строке находки или строкой
+    выше стоит комментарий `ccl:ignore` (с опциональным фильтром rule_id/CWE)."""
+    root = Path(workspace).expanduser().resolve()
+    cache: dict[str, list[str]] = {}
+
+    def file_lines(rel: str) -> list[str]:
+        if rel not in cache:
+            target = (root / rel).resolve()
+            try:
+                target.relative_to(root)
+                cache[rel] = target.read_text(encoding="utf-8", errors="replace").split("\n")
+            except (ValueError, OSError):
+                cache[rel] = []
+        return cache[rel]
+
+    for f in findings:
+        f.setdefault("suppressed", False)
+        lines = file_lines(f["path"])
+        if not lines:
+            continue
+        idx = f["line_start"] - 1
+        for i in (idx, idx - 1):  # строка находки и строка выше
+            if 0 <= i < len(lines):
+                m = SUPPRESSION_RE.search(lines[i])
+                if m:
+                    flt = m.group(1)
+                    if not flt or flt in (f["rule_id"], f.get("cwe") or ""):
+                        f["suppressed"] = True
+                        break
+    return findings
+
+
+# ---------------------------------------------------------------- Coverage
+
+def collect_coverage(workspace: str, sast_scanned: int) -> dict:
+    """Метрики покрытия: сколько файлов реально дошло до анализа."""
+    root = Path(workspace).expanduser().resolve()
+    total = code = secrets_scanned = 0
+    skipped = {"binary": 0, "too_large": 0, "non_code": 0}
+    for full, _text in _iter_text_files(root):
+        secrets_scanned += 1  # builtin-сканер; gitleaks покрывает не меньше
+    for current, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        for fname in filenames:
+            full = Path(current) / fname
+            total += 1
+            try:
+                size = full.stat().st_size
+                if size > 512 * 1024:
+                    skipped["too_large"] += 1
+                    continue
+                if size == 0:
+                    continue
+                with open(full, "rb") as fh:
+                    if b"\x00" in fh.read(8192):
+                        skipped["binary"] += 1
+                        continue
+            except (OSError, PermissionError):
+                continue
+            if full.suffix.lower() in EXT_TO_LANG:
+                code += 1
+            else:
+                skipped["non_code"] += 1
+    return {
+        "total_files": total,
+        "code_files": code,
+        "sast_scanned": sast_scanned,
+        "secrets_scanned": secrets_scanned,
+        "skipped": skipped,
+    }
+
+
+# ---------------------------------------------------------------- Baseline
+
+def _fingerprint(f: dict) -> str:
+    """Стабильный ID находки: правило + путь + заголовок (без номера строки —
+    переживает сдвиг строк при правках)."""
+    raw = f"{f['rule_id']}|{f['path']}|{f['title']}"
+    return hashlib.sha1(raw.encode()).hexdigest()[:16]
+
+
+def _load_baselines() -> dict:
+    if not BASELINES_FILE.exists():
+        return {}
+    try:
+        return json.loads(BASELINES_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_baselines(data: dict) -> None:
+    BASELINES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _current_head(workspace: str) -> Optional[str]:
+    try:
+        from .git_service import _repo
+        repo = _repo(workspace)
+        return repo.head.commit.hexsha[:7] if repo.head.is_valid() else None
+    except Exception:
+        return None
+
+
+def get_baseline(workspace: str) -> Optional[dict]:
+    b = _load_baselines().get(str(Path(workspace).expanduser().resolve()))
+    if not b:
+        return None
+    return {"head": b.get("head"), "created_at": b.get("created_at"), "findings": len(b.get("items", {}))}
+
+
+def delete_baseline(workspace: str) -> dict:
+    data = _load_baselines()
+    removed = data.pop(str(Path(workspace).expanduser().resolve()), None)
+    _save_baselines(data)
+    return {"removed": removed is not None}
+
+
+def save_baseline(workspace: str, report: dict) -> dict:
+    key = str(Path(workspace).expanduser().resolve())
+    items = {
+        _fingerprint(f): {
+            "rule_id": f["rule_id"], "path": f["path"], "title": f["title"],
+            "severity": f["severity"], "line_start": f["line_start"],
+        }
+        for f in report["findings"] if not f.get("suppressed")
+    }
+    data = _load_baselines()
+    data[key] = {
+        "head": _current_head(workspace),
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "items": items,
+    }
+    _save_baselines(data)
+    return {"head": data[key]["head"], "created_at": data[key]["created_at"], "findings": len(items)}
+
+
+def _apply_baseline_diff(workspace: str, report: dict) -> None:
+    """Если есть baseline — пометить is_new у находок и посчитать исправленные."""
+    key = str(Path(workspace).expanduser().resolve())
+    base = _load_baselines().get(key)
+    for f in report["findings"]:
+        f["is_new"] = None
+    if not base:
+        report["baseline"] = None
+        return
+    base_items = base.get("items", {})
+    current_fps = set()
+    new_count = 0
+    for f in report["findings"]:
+        fp = _fingerprint(f)
+        current_fps.add(fp)
+        f["is_new"] = fp not in base_items
+        if f["is_new"]:
+            new_count += 1
+    fixed = [v for k, v in base_items.items() if k not in current_fps]
+    report["baseline"] = {
+        "head": base.get("head"),
+        "created_at": base.get("created_at"),
+        "findings": len(base_items),
+    }
+    report["diff"] = {"new": new_count, "fixed": len(fixed), "fixed_list": fixed[:20]}
+
+
+# ------------------------------------------------------------------- SARIF
+
+def to_sarif(report: dict) -> dict:
+    """SARIF 2.1.0 — совместимость с GitHub Code Scanning и CI-системами."""
+    level_map = {"critical": "error", "warning": "warning", "info": "note"}
+    rules: dict[str, dict] = {}
+    results = []
+    for f in report["findings"]:
+        if f.get("suppressed"):
+            continue
+        rid = f["rule_id"]
+        if rid not in rules:
+            tags = [t for t in (f.get("cwe"), f.get("owasp"), f["tool"]) if t]
+            rules[rid] = {
+                "id": rid,
+                "name": rid,
+                "shortDescription": {"text": f["title"]},
+                "properties": {"tags": tags, "security-severity": f["severity"]},
+            }
+        results.append({
+            "ruleId": rid,
+            "level": level_map.get(f["severity"], "note"),
+            "message": {"text": f"{f['title']}. {f['message']}".strip(". ")},
+            "locations": [{
+                "physicalLocation": {
+                    "artifactLocation": {"uri": f["path"]},
+                    "region": {"startLine": f["line_start"], "endLine": f["line_end"]},
+                },
+            }],
+            "partialFingerprints": {"ccl/v1": _fingerprint(f)},
+        })
+    return {
+        "version": "2.1.0",
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "CodeCogniLint",
+                    "informationUri": "https://github.com/devpilgrin/CodeCogniLint",
+                    "rules": list(rules.values()),
+                },
+            },
+            "results": results,
+        }],
+    }
+
+
+# -------------------------------------------------------------------- Отчёт
+
 async def scan_workspace(workspace: str, verify: bool = False) -> dict:
     semgrep_res = scan_semgrep(workspace)
     secrets_res = scan_secrets(workspace)
     sca_res = scan_sca(workspace)
 
     all_findings = semgrep_res["findings"] + secrets_res["findings"] + sca_res["findings"]
-    if verify and all_findings:
-        all_findings = await verify_findings(workspace, all_findings)
+    all_findings = _apply_suppression(workspace, all_findings)
+
+    active = [f for f in all_findings if not f.get("suppressed")]
+    if verify and active:
+        all_findings = await verify_findings(workspace, active)
 
     all_findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], f["path"], f["line_start"]))
 
     by_severity = {s: 0 for s in SEVERITY_ORDER}
     by_cwe: dict[str, int] = {}
-    confirmed = 0
+    confirmed = suppressed_n = 0
     for f in all_findings:
+        if f.get("suppressed"):
+            suppressed_n += 1
+            continue
         by_severity[f["severity"]] += 1
         if f["cwe"]:
             by_cwe[f["cwe"]] = by_cwe.get(f["cwe"], 0) + 1
         if f["verification"]["status"] == "confirmed":
             confirmed += 1
 
-    return {
+    report = {
         "tools": tools_status(),
         "layers": {
-            "semgrep": {k: v for k, v in semgrep_res.items() if k != "findings"} | {"count": len(semgrep_res["findings"])},
+            "semgrep": {k: v for k, v in semgrep_res.items() if k not in ("findings", "scanned")} | {"count": len(semgrep_res["findings"])},
             "secrets": {k: v for k, v in secrets_res.items() if k != "findings"} | {"count": len(secrets_res["findings"])},
             "sca": {k: v for k, v in sca_res.items() if k != "findings"} | {"count": len(sca_res["findings"])},
         },
+        "coverage": collect_coverage(workspace, semgrep_res.get("scanned", 0)),
         "summary": {
-            "total": len(all_findings),
+            "total": len(active),
+            "suppressed": suppressed_n,
             "by_severity": by_severity,
             "by_cwe": dict(sorted(by_cwe.items(), key=lambda x: -x[1])),
             "confirmed": confirmed,
         },
         "findings": all_findings,
     }
+    _apply_baseline_diff(workspace, report)
+    return report

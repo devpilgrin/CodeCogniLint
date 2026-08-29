@@ -2,17 +2,23 @@ import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faShieldHalved, faSpinner, faFolderOpen, faTriangleExclamation,
-  faCheckCircle, faCircleQuestion, faXmark,
+  faCheckCircle, faCircleQuestion, faXmark, faBookmark, faFileExport,
+  faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { SecurityFinding, SecurityReport } from '../types';
+import type { SecurityFinding, SecurityReport, SecurityBaselineInfo } from '../types';
 
 interface Props {
   hasWorkspace: boolean;
   tools: Record<string, boolean> | null;
   report: SecurityReport | null;
+  baseline: SecurityBaselineInfo | null;
   scanning: boolean;
+  busyBaseline: boolean;
   error: string | null;
   onScan: (verify: boolean) => void;
+  onSaveBaseline: () => void;
+  onDropBaseline: () => void;
+  onDownloadSarif: () => void;
   onOpenFinding: (path: string, line: number) => void;
 }
 
@@ -46,7 +52,8 @@ const TOOL_NAMES: [string, string][] = [
   ['semgrep', 'Semgrep'], ['gitleaks', 'Gitleaks'], ['pip_audit', 'pip-audit'], ['npm', 'npm'],
 ];
 
-export function SecurityPanel({ hasWorkspace, tools, report, scanning, error, onScan, onOpenFinding }: Props) {
+export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning, busyBaseline, error,
+  onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding }: Props) {
   const [verify, setVerify] = useState(true);
 
   return (
@@ -102,6 +109,47 @@ export function SecurityPanel({ hasWorkspace, tools, report, scanning, error, on
               />
               LLM-верификация находок (топ-10)
             </label>
+
+            {/* Baseline + SARIF */}
+            <div className="flex space-x-1.5 pt-1">
+              {baseline ? (
+                <>
+                  <div
+                    className="flex-1 text-[9px] text-gray-500 bg-[#161b22] border border-[#30363d] rounded px-2 py-1 truncate"
+                    title={`Baseline от ${baseline.created_at}${baseline.head ? `, коммит ${baseline.head}` : ''}`}
+                  >
+                    <FontAwesomeIcon icon={faBookmark} className="mr-1 text-blue-400" />
+                    baseline: {baseline.findings} нах. {baseline.head && `· ${baseline.head}`}
+                  </div>
+                  <button
+                    onClick={onDropBaseline}
+                    disabled={busyBaseline}
+                    className="px-2 text-[10px] text-gray-500 hover:text-red-400 border border-[#30363d] rounded transition-colors disabled:opacity-40"
+                    title="Удалить baseline"
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onSaveBaseline}
+                  disabled={busyBaseline || scanning}
+                  className="flex-1 text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-400 hover:text-blue-300 hover:border-blue-500/40 transition-colors disabled:opacity-40 flex items-center justify-center"
+                  title="Запомнить текущие находки как baseline — следующие сканы покажут новые/исправленные"
+                >
+                  <FontAwesomeIcon icon={faBookmark} className="mr-1" />
+                  {busyBaseline ? 'Сохранение...' : 'Сделать baseline'}
+                </button>
+              )}
+              <button
+                onClick={onDownloadSarif}
+                disabled={scanning}
+                className="px-2 text-[10px] text-gray-500 hover:text-green-400 border border-[#30363d] rounded transition-colors disabled:opacity-40"
+                title="Скачать SARIF (GitHub Code Scanning / CI)"
+              >
+                <FontAwesomeIcon icon={faFileExport} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">
@@ -116,13 +164,39 @@ export function SecurityPanel({ hasWorkspace, tools, report, scanning, error, on
               <>
                 {/* Summary */}
                 <div className="px-3 py-2 space-y-1.5 border-b border-[#30363d]">
-                  <div className="flex items-center space-x-2 text-[10px]">
+                  <div className="flex items-center space-x-2 text-[10px] flex-wrap gap-y-1">
                     <span className="text-red-400 font-bold">{report.summary.by_severity.critical} crit</span>
                     <span className="text-yellow-400 font-bold">{report.summary.by_severity.warning} warn</span>
                     <span className="text-blue-400 font-bold">{report.summary.by_severity.info} info</span>
                     {report.summary.confirmed > 0 && (
                       <span className="text-gray-400">· {report.summary.confirmed} подтв.</span>
                     )}
+                    {report.summary.suppressed > 0 && (
+                      <span className="text-gray-600" title="Подавлены комментариями ccl:ignore">
+                        · {report.summary.suppressed} подавл.
+                      </span>
+                    )}
+                  </div>
+                  {/* Baseline diff */}
+                  {report.diff && report.baseline && (
+                    <div className="flex items-center space-x-2 text-[10px]">
+                      <span className={report.diff.new > 0 ? 'text-red-400 font-bold' : 'text-gray-500'}>
+                        +{report.diff.new} новых
+                      </span>
+                      <span className={report.diff.fixed > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}>
+                        −{report.diff.fixed} исправлено
+                      </span>
+                      <span className="text-gray-600 code-font text-[9px]">vs {report.baseline.head ?? report.baseline.created_at.slice(0, 10)}</span>
+                    </div>
+                  )}
+                  {/* Coverage */}
+                  <div
+                    className="text-[9px] text-gray-600"
+                    title={`Всего файлов: ${report.coverage.total_files}; кода: ${report.coverage.code_files}; SAST просканировано: ${report.coverage.sast_scanned}; секреты: ${report.coverage.secrets_scanned}; пропущено: бинарных ${report.coverage.skipped.binary}, больших ${report.coverage.skipped.too_large}, не-кода ${report.coverage.skipped.non_code}`}
+                  >
+                    Покрытие: {report.coverage.sast_scanned}/{report.coverage.code_files} файлов кода
+                    {(report.coverage.skipped.binary + report.coverage.skipped.too_large) > 0 &&
+                      ` · пропущено ${report.coverage.skipped.binary + report.coverage.skipped.too_large}`}
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {Object.entries(report.summary.by_cwe).map(([cwe, n]) => (
@@ -151,14 +225,24 @@ export function SecurityPanel({ hasWorkspace, tools, report, scanning, error, on
                       key={f.id}
                       onClick={() => onOpenFinding(f.path, f.line_start)}
                       className={`w-full text-left px-3 py-2 border-b border-[#21262d] hover:bg-[#161b22] transition-colors ${
-                        f.verification.status === 'false_positive' ? 'opacity-45' : ''
+                        f.suppressed || f.verification.status === 'false_positive' ? 'opacity-45' : ''
                       }`}
-                      title={`${f.path}:${f.line_start}\n${f.message}${f.verification.rationale ? '\nВерификатор: ' + f.verification.rationale : ''}`}
+                      title={`${f.path}:${f.line_start}\n${f.message}${f.suppressed ? '\nПодавлено: ccl:ignore' : ''}${f.verification.rationale ? '\nВерификатор: ' + f.verification.rationale : ''}`}
                     >
                       <div className="flex items-center space-x-1.5">
                         <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${sevBadge[f.severity]}`}>
                           {sevLabel[f.severity]}
                         </span>
+                        {f.is_new === true && (
+                          <span className="text-[9px] font-bold px-1 py-0.5 rounded text-red-300 bg-red-500/20 border border-red-500/30">
+                            NEW
+                          </span>
+                        )}
+                        {f.suppressed && (
+                          <span className="text-[9px] font-bold px-1 py-0.5 rounded text-gray-500 bg-gray-500/20">
+                            SUPPR
+                          </span>
+                        )}
                         <span className="text-[9px] px-1 py-0.5 rounded text-gray-500 bg-gray-500/10">
                           {toolLabel[f.tool] ?? f.tool}
                         </span>

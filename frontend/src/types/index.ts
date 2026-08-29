@@ -203,6 +203,8 @@ export interface SecurityFinding {
   message: string;
   snippet: string;
   verification: { status: VerificationStatus; rationale: string };
+  suppressed?: boolean;
+  is_new?: boolean | null;
 }
 
 export interface SecurityLayerInfo {
@@ -212,14 +214,30 @@ export interface SecurityLayerInfo {
   note?: string;
 }
 
+export interface SecurityBaselineInfo {
+  head: string | null;
+  created_at: string;
+  findings: number;
+}
+
 export interface SecurityReport {
   tools: Record<string, boolean>;
   layers: { semgrep: SecurityLayerInfo; secrets: SecurityLayerInfo; sca: SecurityLayerInfo };
+  coverage: {
+    total_files: number;
+    code_files: number;
+    sast_scanned: number;
+    secrets_scanned: number;
+    skipped: { binary: number; too_large: number; non_code: number };
+  };
   summary: {
     total: number;
+    suppressed: number;
     by_severity: Record<'critical' | 'warning' | 'info', number>;
     by_cwe: Record<string, number>;
     confirmed: number;
   };
+  baseline: SecurityBaselineInfo | null;
+  diff?: { new: number; fixed: number; fixed_list: { title: string; path: string }[] };
   findings: SecurityFinding[];
 }

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { securityApi } from '../services/api';
-import type { SecurityReport } from '../types';
+import type { SecurityReport, SecurityBaselineInfo } from '../types';
 
 function errText(e: unknown): string {
   if (axios.isAxiosError(e)) {
@@ -16,7 +16,9 @@ function errText(e: unknown): string {
 export function useSecurity(workspacePath: string | null) {
   const [tools, setTools] = useState<Record<string, boolean> | null>(null);
   const [report, setReport] = useState<SecurityReport | null>(null);
+  const [baseline, setBaseline] = useState<SecurityBaselineInfo | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [busyBaseline, setBusyBaseline] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,9 +26,11 @@ export function useSecurity(workspacePath: string | null) {
     setError(null);
     if (!workspacePath) {
       setTools(null);
+      setBaseline(null);
       return;
     }
     securityApi.tools().then(setTools).catch(() => setTools(null));
+    securityApi.getBaseline().then(setBaseline).catch(() => setBaseline(null));
   }, [workspacePath]);
 
   const runScan = useCallback(async (verify: boolean) => {
@@ -42,10 +46,53 @@ export function useSecurity(workspacePath: string | null) {
     }
   }, []);
 
+  const saveBaseline = useCallback(async () => {
+    setBusyBaseline(true);
+    try {
+      const b = await securityApi.saveBaseline();
+      setBaseline(b);
+      if (report) setReport({ ...report, baseline: b, diff: { new: 0, fixed: 0, fixed_list: [] } });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusyBaseline(false);
+    }
+  }, [report]);
+
+  const dropBaseline = useCallback(async () => {
+    setBusyBaseline(true);
+    try {
+      await securityApi.deleteBaseline();
+      setBaseline(null);
+      if (report) setReport({ ...report, baseline: null });
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusyBaseline(false);
+    }
+  }, [report]);
+
+  const downloadSarif = useCallback(async () => {
+    try {
+      const blob = await securityApi.sarif();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'security-scan.sarif';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(errText(e));
+    }
+  }, []);
+
   const clearReport = useCallback(() => {
     setReport(null);
     setError(null);
   }, []);
 
-  return { tools, report, scanning, error, runScan, clearReport };
+  return {
+    tools, report, baseline, scanning, busyBaseline, error,
+    runScan, saveBaseline, dropBaseline, downloadSarif, clearReport,
+  };
 }

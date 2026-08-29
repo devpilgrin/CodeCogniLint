@@ -64,3 +64,39 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  security:
+    name: Security gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Жёсткий гейт: любая находка вендоренных правил роняет CI
+      - name: SAST gate (Semgrep)
+        run: |
+          pip install semgrep==1.139.0
+          semgrep scan --config backend/security/semgrep-rules.yml \
+            --error --metrics off backend/ frontend/src/
+
+      # SCA: гейт с задокументированными исключениями — click 8.1.8 и mcp 1.12.2
+      # жёстко запинены самим semgrep (его рантайм, CLI-сканер, не attack surface
+      # приложения); новые CVE в остальных зависимостях роняют CI
+      - name: SCA gate (pip-audit)
+        run: |
+          pip install pip-audit==2.9.0
+          pip-audit -r backend/requirements.txt --progress-spinner off \
+            --ignore-vuln PYSEC-2026-2132 \
+            --ignore-vuln PYSEC-2026-1617 \
+            --ignore-vuln PYSEC-2026-3483 \
+            --ignore-vuln PYSEC-2026-3482
+
+      # Frontend-зависимости — совещательно (registry churn не должен блокировать CI)
+      - name: npm audit (advisory)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit --omit=dev

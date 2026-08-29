@@ -71,9 +71,10 @@ export default function App() {
     runFileReview, runChangesReview, clearReview,
   } = useReview();
   const {
-    tools: securityTools, report: securityReport,
-    scanning: securityScanning, error: securityError,
-    runScan: runSecurityScan,
+    tools: securityTools, report: securityReport, baseline: securityBaseline,
+    scanning: securityScanning, busyBaseline: securityBusyBaseline, error: securityError,
+    runScan: runSecurityScan, saveBaseline: saveSecurityBaseline,
+    dropBaseline: dropSecurityBaseline, downloadSarif,
   } = useSecurity(workspace?.path ?? null);
 
   const activeTab = tabs[activeTabIndex] ?? null;
@@ -416,9 +417,14 @@ export default function App() {
           onEditRule={handleEditRule}
           securityTools={securityTools}
           securityReport={securityReport}
+          securityBaseline={securityBaseline}
           securityScanning={securityScanning}
+          securityBusyBaseline={securityBusyBaseline}
           securityError={securityError}
           onSecurityScan={handleSecurityScan}
+          onSecuritySaveBaseline={saveSecurityBaseline}
+          onSecurityDropBaseline={dropSecurityBaseline}
+          onSecuritySarif={downloadSarif}
           onOpenFinding={handleOpenFinding}
         />
 

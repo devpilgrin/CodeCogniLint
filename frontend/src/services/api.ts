@@ -3,7 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult, SecurityReport,
+  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -84,4 +84,12 @@ export const securityApi = {
   tools: () => api.get<Record<string, boolean>>('/security/tools').then(r => r.data),
   scan: (verify: boolean) =>
     api.post<SecurityReport>('/security/scan', null, { params: { verify } }).then(r => r.data),
+  getBaseline: () =>
+    api.get<{ baseline: SecurityBaselineInfo | null }>('/security/baseline').then(r => r.data.baseline),
+  saveBaseline: () =>
+    api.post<SecurityBaselineInfo>('/security/baseline').then(r => r.data),
+  deleteBaseline: () =>
+    api.delete<{ removed: boolean }>('/security/baseline').then(r => r.data),
+  sarif: () =>
+    api.post('/security/sarif', null, { responseType: 'blob' }).then(r => r.data as Blob),
 };

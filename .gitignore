@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CodeCogniLint runtime state (per-machine)
+backend/.hybrid-security-baselines.json
+backend/.hybrid-workspace.json
+backend/.hybrid-rules.json
+backend/.env
+backend/projects/
+backend/.venv/
+backend.log
+frontend.log

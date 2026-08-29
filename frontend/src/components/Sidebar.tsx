@@ -4,7 +4,7 @@ import {
   faDatabase, faFolderOpen,
   faXmark, faTriangleExclamation, faPlus, faPencil, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport } from '../types';
+import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
@@ -28,9 +28,14 @@ interface Props {
   // Security scan
   securityTools: Record<string, boolean> | null;
   securityReport: SecurityReport | null;
+  securityBaseline: SecurityBaselineInfo | null;
   securityScanning: boolean;
+  securityBusyBaseline: boolean;
   securityError: string | null;
   onSecurityScan: (verify: boolean) => void;
+  onSecuritySaveBaseline: () => void;
+  onSecurityDropBaseline: () => void;
+  onSecuritySarif: () => void;
   onOpenFinding: (path: string, line: number) => void;
 }
 
@@ -239,9 +244,14 @@ export function Sidebar(props: Props) {
         hasWorkspace={workspace !== null}
         tools={props.securityTools}
         report={props.securityReport}
+        baseline={props.securityBaseline}
         scanning={props.securityScanning}
+        busyBaseline={props.securityBusyBaseline}
         error={props.securityError}
         onScan={props.onSecurityScan}
+        onSaveBaseline={props.onSecuritySaveBaseline}
+        onDropBaseline={props.onSecurityDropBaseline}
+        onDownloadSarif={props.onSecuritySarif}
         onOpenFinding={props.onOpenFinding}
       />
     );
