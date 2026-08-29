@@ -4,13 +4,14 @@ import {
   faDatabase, faFolderOpen,
   faXmark, faTriangleExclamation, faPlus, faPencil, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo } from '../types';
+import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
+import { SecurityPanel } from './SecurityPanel';
 
 interface Props {
-  panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings';
+  panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
   workspace: WorkspaceInfo | null;
   tree: TreeNode | null;
   activeFile: string | null;
@@ -24,6 +25,13 @@ interface Props {
   onToggleRule: (id: string, enabled: boolean) => void;
   onCreateRuleManually: () => void;
   onEditRule: (rule: Rule) => void;
+  // Security scan
+  securityTools: Record<string, boolean> | null;
+  securityReport: SecurityReport | null;
+  securityScanning: boolean;
+  securityError: string | null;
+  onSecurityScan: (verify: boolean) => void;
+  onOpenFinding: (path: string, line: number) => void;
 }
 
 const categoryColor: Record<string, string> = {
@@ -223,6 +231,20 @@ export function Sidebar(props: Props) {
 
   if (panel === 'git') {
     return <GitPanel workspace={workspace} onFileOpen={onFileOpen} />;
+  }
+
+  if (panel === 'security') {
+    return (
+      <SecurityPanel
+        hasWorkspace={workspace !== null}
+        tools={props.securityTools}
+        report={props.securityReport}
+        scanning={props.securityScanning}
+        error={props.securityError}
+        onScan={props.onSecurityScan}
+        onOpenFinding={props.onOpenFinding}
+      />
+    );
   }
 
   // Explorer panel

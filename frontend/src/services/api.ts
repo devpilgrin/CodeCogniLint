@@ -3,7 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult,
+  ReviewResult, ChangesReviewResult, SecurityReport,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -78,4 +78,10 @@ export const reviewApi = {
     api.post<ReviewResult>('/review/file', { file_path: filePath, content }).then(r => r.data),
   reviewChanges: () =>
     api.post<ChangesReviewResult>('/review/changes').then(r => r.data),
+};
+
+export const securityApi = {
+  tools: () => api.get<Record<string, boolean>>('/security/tools').then(r => r.data),
+  scan: (verify: boolean) =>
+    api.post<SecurityReport>('/security/scan', null, { params: { verify } }).then(r => r.data),
 };

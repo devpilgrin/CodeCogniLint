@@ -19,9 +19,10 @@ import { useRules } from './hooks/useRules';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useReview } from './hooks/useReview';
+import { useSecurity } from './hooks/useSecurity';
 import type { OpenTab, Rule, RuleCategory, Violation } from './types';
 
-type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings';
+type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
 
 interface PendingRule {
   code: string;
@@ -69,6 +70,11 @@ export default function App() {
     reviewing, state: reviewState, error: reviewError,
     runFileReview, runChangesReview, clearReview,
   } = useReview();
+  const {
+    tools: securityTools, report: securityReport,
+    scanning: securityScanning, error: securityError,
+    runScan: runSecurityScan,
+  } = useSecurity(workspace?.path ?? null);
 
   const activeTab = tabs[activeTabIndex] ?? null;
   const violations: Violation[] = activeTab ? (resultsByFile[activeTab.path]?.violations ?? []) : [];
@@ -250,6 +256,19 @@ export default function App() {
     runChangesReview();
   }, [workspace, runChangesReview]);
 
+  // ---- Security scan ----
+  const handleSecurityScan = useCallback((verify: boolean) => {
+    if (!workspace) return;
+    runSecurityScan(verify);
+  }, [workspace, runSecurityScan]);
+
+  /** Открыть файл находки и перепрыгнуть к строке (после загрузки таба). */
+  const handleOpenFinding = useCallback((path: string, line: number) => {
+    void openFile(path).then(() => {
+      setTimeout(() => editorPaneRef.current?.jumpToLine(line), 150);
+    });
+  }, [openFile]);
+
   // ---- Rule creation ----
   const handleCreateRule = useCallback((code: string, category: RuleCategory) => {
     setPendingRule({ code, category });
@@ -395,6 +414,12 @@ export default function App() {
           onToggleRule={toggleRule}
           onCreateRuleManually={handleOpenManual}
           onEditRule={handleEditRule}
+          securityTools={securityTools}
+          securityReport={securityReport}
+          securityScanning={securityScanning}
+          securityError={securityError}
+          onSecurityScan={handleSecurityScan}
+          onOpenFinding={handleOpenFinding}
         />
 
         <EditorPane

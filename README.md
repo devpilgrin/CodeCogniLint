@@ -15,6 +15,7 @@
 - **Открытие проектов** — локальная папка или клонирование Git-репозитория прямо из UI; список недавних проектов
 - **Git-контур** — сохранение правок на диск (Ctrl+S), панель Git: статус ветки, список изменений, commit / push / pull, история коммитов; push по HTTPS с токеном (не сохраняется в конфиг) или по SSH
 - **Агент код-ревью** — специализированный LLM-ревьюер: вердикт (одобрено / комментарии / требуются правки), замечания с категориями (баг / безопасность / производительность / стиль / поддерживаемость) и привязкой к строкам, сильные стороны кода; режимы: текущий файл и незакоммиченные изменения (git)
+- **Security-скан (SAST/SCA)** — детерминированный слой: Semgrep с вендоренными правилами (CWE/OWASP-метаданные, офлайн), поиск секретов (gitleaks или встроенные regex), уязвимости зависимостей (pip-audit / npm audit); опциональный второй проход — LLM-верификатор подтверждает/опровергает находки
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -163,6 +164,8 @@ LLM_API_KEY=lm-studio
 | GET   | `/api/git/log?limit=...`          | Последние коммиты                         |
 | POST  | `/api/review/file`                | Агент код-ревью: ревью одного файла       |
 | POST  | `/api/review/changes`             | Ревью незакоммиченных изменений (git)     |
+| GET   | `/api/security/tools`             | Доступность движков (semgrep/gitleaks/…)  |
+| POST  | `/api/security/scan?verify=`      | Security-скан: SAST + секреты + SCA (+LLM-верификация) |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -192,11 +195,15 @@ CodeCogniLint/
 │   │   ├── workspace.py              # open/clone/tree/file/browse + сохранение файла
 │   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log
 │   │   ├── review.py                 # /review: агент код-ревью (file, changes)
+│   │   ├── security.py               # /security: tools + scan (SAST/секреты/SCA)
 │   │   └── settings.py               # LLM-настройки + запись в .env
+│   ├── security/
+│   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
 │   └── services/
 │       ├── llm_adapter.py            # LLMError + friendly error mapping
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
 │       ├── review_agent.py           # агент код-ревью: вердикт, issues, positives
+│       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
@@ -208,8 +215,9 @@ CodeCogniLint/
 │       ├── components/
 │       │   ├── Header.tsx
 │       │   ├── ActivityBar.tsx
-│       │   ├── Sidebar.tsx           # explorer / git / rules / settings
+│       │   ├── Sidebar.tsx           # explorer / git / security / rules / settings
 │       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
+│       │   ├── SecurityPanel.tsx     # security-скан: находки, CWE, верификация
 │       │   ├── ReviewTab.tsx         # агент код-ревью: вердикт, issues, positives
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
 │       │   ├── AIPanel.tsx           # вкладки: scope + Ревью + Чат
@@ -224,6 +232,7 @@ CodeCogniLint/
 │       │   ├── useAnalysis.ts        # одиночный + SSE репо
 │       │   ├── useGit.ts             # статус/commit/push/pull + уведомления
 │       │   ├── useReview.ts          # агент код-ревью (file / changes)
+│       │   ├── useSecurity.ts        # security-скан + статус инструментов
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
@@ -245,6 +254,8 @@ CodeCogniLint/
 - **Git push без утечки токена** — HTTPS-токен подставляется в URL только на время вызова `git push <url>`, в `.git/config` не сохраняется; после push remote-tracking ref и upstream-конфиг обновляются вручную; в ошибках креды маскируются `***`. SSH-remote (`git@...`) работает нативно через ключи ОС
 - **Агент код-ревью** — отдельный промпт-«личность» ревьюера поверх `review_agent.py`: детерминированная нормализация ответа LLM (вердикт, severity, категории обрезаются до допустимых значений), повторное использование snippet-based коррекции номеров строк; режим `changes` берёт изменённые файлы из git status и ревьюит каждый с diff-контекстом
 - **Настраиваемая температура LLM** — `LLM_TEMPERATURE` в `.env` (по умолчанию 0.3): часть моделей (например, reasoning-модели) принимает только `temperature=1`
+- **Детерминированный security-слой** — Semgrep с вендоренным набором правил (`security/semgrep-rules.yml`, CWE/OWASP-метаданные, работает офлайн без реестра); секреты — gitleaks при наличии, иначе встроенные regex; SCA — pip-audit по `requirements*.txt` и npm audit по `package-lock.json`. Каждый слой деградирует независимо (`status: unavailable` без падения отчёта)
+- **LLM — верификатор, не детектор** — топ-10 находок (по severity) вторым проходом подтверждаются/опровергаются LLM с контекстом кода (`confirmed` / `false_positive` + обоснование); модель не ищет уязвимости сама — это устраняет галлюцинации и пропуски
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -257,6 +268,7 @@ CodeCogniLint/
 - Сохранение правок на диск (Ctrl+S, атомарная запись, индикатор «dirty»)
 - Git-панель: статус ветки, изменения, commit / push / pull, история
 - Агент код-ревью: вердикт + замечания по строкам + сильные стороны (файл и git-изменения)
+- Security-скан: Semgrep (CWE/OWASP), секреты, уязвимые зависимости + LLM-верификация
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)
 

@@ -185,3 +185,41 @@ export interface ChangesReviewResult {
   summary: string;
   files: ReviewResult[];
 }
+
+// ---- Security scan (волна 1: SAST + секреты + SCA) ----
+export type VerificationStatus = 'confirmed' | 'false_positive' | 'unverified';
+
+export interface SecurityFinding {
+  id: string;
+  tool: 'semgrep' | 'gitleaks' | 'secrets' | 'pip-audit' | 'npm-audit';
+  rule_id: string;
+  severity: 'critical' | 'warning' | 'info';
+  cwe: string | null;
+  owasp: string | null;
+  path: string;
+  line_start: number;
+  line_end: number;
+  title: string;
+  message: string;
+  snippet: string;
+  verification: { status: VerificationStatus; rationale: string };
+}
+
+export interface SecurityLayerInfo {
+  status: string;
+  count: number;
+  reason?: string;
+  note?: string;
+}
+
+export interface SecurityReport {
+  tools: Record<string, boolean>;
+  layers: { semgrep: SecurityLayerInfo; secrets: SecurityLayerInfo; sca: SecurityLayerInfo };
+  summary: {
+    total: number;
+    by_severity: Record<'critical' | 'warning' | 'info', number>;
+    by_cwe: Record<string, number>;
+    confirmed: number;
+  };
+  findings: SecurityFinding[];
+}
