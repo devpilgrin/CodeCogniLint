@@ -268,7 +268,7 @@ CodeCogniLint/
 - **LLM — верификатор, не детектор** — топ-10 находок (по severity) вторым проходом подтверждаются/опровергаются LLM с контекстом кода (`confirmed` / `false_positive` + обоснование); модель не ищет уязвимости сама — это устраняет галлюцинации и пропуски
 - **Suppression** — комментарий `# ccl:ignore [rule_id|CWE]` на строке находки или строкой выше подавляет её во всех слоях; подавленные видны в отчёте серым, в SARIF не попадают, в baseline не сохраняются
 - **Baseline/diff** — fingerprint находки = sha256(правило + путь + заголовок), переживает сдвиг строк; скан при сохранённом baseline помечает `NEW` и считает исправленные
-- **Security-gate в CI** — semgrep с вендоренными правилами роняет сборку на любой находке; pip-audit с задокументированными `--ignore-vuln` (click/mcp — жёстко запиненный рантайм semgrep); npm audit — совещательно
+- **Security-gate в CI** — semgrep с вендоренными правилами роняет сборку на любой находке; pip-audit по `requirements.txt` без исключений (зависимости держатся на версиях без известных CVE); npm audit — совещательно
 - **DAST-пентест** — встроенные config-checks (заголовки/CORS/TRACE/.env/.git) без зависимостей; фаззинг API через schemathesis по `/openapi.json` с junit-парсингом; nuclei — feature-detect. Синхронные HTTP и CLI вынесены в потоки (`asyncio.to_thread`), иначе самосканирование блокирует event loop
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
@@ -285,7 +285,7 @@ CodeCogniLint/
 - Security-скан: Semgrep (CWE/OWASP), секреты, уязвимые зависимости + LLM-верификация
 - Suppression `# ccl:ignore`, baseline/diff находок, метрики покрытия, SARIF-экспорт
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
-- Security-gate в CI (semgrep + pip-audit с документированными исключениями)
+- Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)
 
