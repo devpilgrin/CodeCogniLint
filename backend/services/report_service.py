@@ -69,128 +69,114 @@ def _xsafe(v) -> str:
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff]", "?", s)
 
 
-def generate_xlsx(results: dict) -> bytes:
-    agg = _aggregate(results)
-    wb = Workbook()
-
-    bold = Font(bold=True)
-    header_fill = PatternFill("solid", fgColor="FF22272E")
-    header_font = Font(bold=True, color="FFFFFFFF")
+def _xls_styles() -> dict:
+    """Фабрика стилей openpyxl (объекты нельзя разделять между ячейками листов)."""
     thin = Side(border_style="thin", color="FFCCCCCC")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    title_font = Font(bold=True, size=14, color="FF1F6FEB")
+    return {
+        "bold": Font(bold=True),
+        "header_fill": PatternFill("solid", fgColor="FF22272E"),
+        "header_font": Font(bold=True, color="FFFFFFFF"),
+        "border": Border(left=thin, right=thin, top=thin, bottom=thin),
+        "title_font": Font(bold=True, size=14, color="FF1F6FEB"),
+    }
 
-    # --- Sheet 1: Сводка ---
+
+def _xls_header_row(ws, headers: list[str], st: dict) -> None:
+    for col_idx, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=col_idx, value=h)
+        c.font = st["header_font"]
+        c.fill = st["header_fill"]
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = st["border"]
+
+
+def _xls_summary_sheet(wb, agg: dict, st: dict) -> None:
     ws = wb.active
     ws.title = "Сводка"
-
     ws["A1"] = "Сводный отчёт по сканированию"
-    ws["A1"].font = title_font
+    ws["A1"].font = st["title_font"]
     ws.merge_cells("A1:B1")
-
     ws["A2"] = f"Сформирован: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws["A2"].font = Font(italic=True, color="FF888888")
     ws.merge_cells("A2:B2")
 
     row = 4
-    ws.cell(row=row, column=1, value="Параметр").font = bold
-    ws.cell(row=row, column=2, value="Значение").font = bold
-    row += 1
-    ws.cell(row=row, column=1, value="Файлов проанализировано")
-    ws.cell(row=row, column=2, value=agg["total_files"])
-    row += 1
-    ws.cell(row=row, column=1, value="Всего нарушений")
-    ws.cell(row=row, column=2, value=agg["total_violations"])
-
-    row += 2
-    ws.cell(row=row, column=1, value="По категории").font = bold
-    row += 1
-    for cat, count in sorted(agg["by_category"].items(), key=lambda x: -x[1]):
-        ws.cell(row=row, column=1, value=_xsafe(CATEGORY_LABEL.get(cat, cat)))
-        ws.cell(row=row, column=2, value=count)
+    ws.cell(row=row, column=1, value="Параметр").font = st["bold"]
+    ws.cell(row=row, column=2, value="Значение").font = st["bold"]
+    for label, value in (("Файлов проанализировано", agg["total_files"]),
+                         ("Всего нарушений", agg["total_violations"])):
         row += 1
+        ws.cell(row=row, column=1, value=label)
+        ws.cell(row=row, column=2, value=value)
 
-    row += 1
-    ws.cell(row=row, column=1, value="По серьёзности").font = bold
-    row += 1
-    for sev, count in sorted(agg["by_severity"].items(), key=lambda x: -x[1]):
-        cell = ws.cell(row=row, column=1, value=_xsafe(SEVERITY_LABEL.get(sev, sev)))
-        if sev in SEVERITY_COLOR:
-            cell.font = Font(bold=True, color=SEVERITY_COLOR[sev].replace("FF", "FF", 1))
-        ws.cell(row=row, column=2, value=count)
-        row += 1
+    for title, data, labels in (("По категории", agg["by_category"], CATEGORY_LABEL),
+                                ("По серьёзности", agg["by_severity"], SEVERITY_LABEL)):
+        row += 2
+        ws.cell(row=row, column=1, value=title).font = st["bold"]
+        for key, count in sorted(data.items(), key=lambda x: -x[1]):
+            row += 1
+            cell = ws.cell(row=row, column=1, value=_xsafe(labels.get(key, key)))
+            if title == "По серьёзности" and key in SEVERITY_COLOR:
+                cell.font = Font(bold=True, color=SEVERITY_COLOR[key])
+            ws.cell(row=row, column=2, value=count)
 
     ws.column_dimensions["A"].width = 32
     ws.column_dimensions["B"].width = 14
 
-    # --- Sheet 2: По файлам ---
-    ws2 = wb.create_sheet("По файлам")
-    headers = ["Файл", "Всего", "Критично", "Важно", "Инфо"]
-    for col_idx, h in enumerate(headers, 1):
-        c = ws2.cell(row=1, column=col_idx, value=h)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = Alignment(horizontal="center")
-        c.border = border
 
+def _xls_files_sheet(wb, agg: dict, st: dict) -> None:
+    ws = wb.create_sheet("По файлам")
+    _xls_header_row(ws, ["Файл", "Всего", "Критично", "Важно", "Инфо"], st)
+    sev_cols = ((3, "critical", True), (4, "warning", False), (5, "info", False))
     for r_idx, f in enumerate(agg["per_file"], start=2):
-        ws2.cell(row=r_idx, column=1, value=_xsafe(f["path"])).border = border
-        ws2.cell(row=r_idx, column=2, value=f["total"]).border = border
-        crit = ws2.cell(row=r_idx, column=3, value=f["critical"])
-        if f["critical"] > 0: crit.font = Font(bold=True, color=SEVERITY_COLOR["critical"])
-        crit.border = border
-        warn = ws2.cell(row=r_idx, column=4, value=f["warning"])
-        if f["warning"] > 0: warn.font = Font(color=SEVERITY_COLOR["warning"])
-        warn.border = border
-        info = ws2.cell(row=r_idx, column=5, value=f["info"])
-        if f["info"] > 0: info.font = Font(color=SEVERITY_COLOR["info"])
-        info.border = border
+        ws.cell(row=r_idx, column=1, value=_xsafe(f["path"])).border = st["border"]
+        ws.cell(row=r_idx, column=2, value=f["total"]).border = st["border"]
+        for col, key, bold in sev_cols:
+            cell = ws.cell(row=r_idx, column=col, value=f[key])
+            if f[key] > 0:
+                cell.font = Font(bold=bold, color=SEVERITY_COLOR[key])
+            cell.border = st["border"]
         for col in range(2, 6):
-            ws2.cell(row=r_idx, column=col).alignment = Alignment(horizontal="center")
-
+            ws.cell(row=r_idx, column=col).alignment = Alignment(horizontal="center")
     for col_letter, w in zip("ABCDE", [50, 10, 12, 10, 10]):
-        ws2.column_dimensions[col_letter].width = w
-    ws2.freeze_panes = "A2"
+        ws.column_dimensions[col_letter].width = w
+    ws.freeze_panes = "A2"
 
-    # --- Sheet 3: Все нарушения ---
-    ws3 = wb.create_sheet("Нарушения")
-    headers = ["Файл", "Строка", "Severity", "Категория", "Правило", "Описание", "Сниппет", "Рекомендация"]
-    for col_idx, h in enumerate(headers, 1):
-        c = ws3.cell(row=1, column=col_idx, value=h)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = border
 
+def _xls_violations_sheet(wb, agg: dict, st: dict) -> None:
+    ws = wb.create_sheet("Нарушения")
+    _xls_header_row(ws, ["Файл", "Строка", "Severity", "Категория", "Правило",
+                         "Описание", "Сниппет", "Рекомендация"], st)
     r_idx = 2
     for f in agg["per_file"]:
         for v in f["violations"]:
-            ls = v.get("line_start", "")
-            le = v.get("line_end", "")
+            ls, le = v.get("line_start", ""), v.get("line_end", "")
             line_str = f"{ls}" if not le or le == ls else f"{ls}–{le}"
-
-            ws3.cell(row=r_idx, column=1, value=_xsafe(f["path"]))
-            ws3.cell(row=r_idx, column=2, value=_xsafe(line_str))
-            sev_cell = ws3.cell(row=r_idx, column=3, value=_xsafe(SEVERITY_LABEL.get(v.get("severity", ""), v.get("severity", ""))))
-            sev_key = v.get("severity")
-            if sev_key in SEVERITY_COLOR:
-                sev_cell.font = Font(bold=True, color=SEVERITY_COLOR[sev_key])
-            ws3.cell(row=r_idx, column=4, value=_xsafe(CATEGORY_LABEL.get(v.get("category", ""), v.get("category", ""))))
-            ws3.cell(row=r_idx, column=5, value=_xsafe(v.get("rule_description", "")))
-            ws3.cell(row=r_idx, column=6, value=_xsafe(v.get("explanation", "")))
-            ws3.cell(row=r_idx, column=7, value=_xsafe(v.get("code_snippet", "")))
-            ws3.cell(row=r_idx, column=8, value=_xsafe(v.get("suggestion", "")))
-
-            for col in range(1, 9):
-                cell = ws3.cell(row=r_idx, column=col)
-                cell.border = border
+            sev = v.get("severity", "")
+            values = [_xsafe(f["path"]), _xsafe(line_str),
+                      _xsafe(SEVERITY_LABEL.get(sev, sev)),
+                      _xsafe(CATEGORY_LABEL.get(v.get("category", ""), v.get("category", ""))),
+                      _xsafe(v.get("rule_description", "")), _xsafe(v.get("explanation", "")),
+                      _xsafe(v.get("code_snippet", "")), _xsafe(v.get("suggestion", ""))]
+            for col, value in enumerate(values, 1):
+                cell = ws.cell(row=r_idx, column=col, value=value)
+                cell.border = st["border"]
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if sev in SEVERITY_COLOR:
+                ws.cell(row=r_idx, column=3).font = Font(bold=True, color=SEVERITY_COLOR[sev])
             r_idx += 1
-
     for col_letter, w in zip("ABCDEFGH", [32, 10, 12, 14, 40, 50, 40, 50]):
-        ws3.column_dimensions[col_letter].width = w
-    ws3.freeze_panes = "A2"
+        ws.column_dimensions[col_letter].width = w
+    ws.freeze_panes = "A2"
 
+
+def generate_xlsx(results: dict) -> bytes:
+    agg = _aggregate(results)
+    wb = Workbook()
+    st = _xls_styles()
+    _xls_summary_sheet(wb, agg, st)
+    _xls_files_sheet(wb, agg, st)
+    _xls_violations_sheet(wb, agg, st)
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -282,6 +268,45 @@ def _esc(v) -> str:
              .replace('"', "&quot;"))
 
 
+def _html_li(items) -> str:
+    return "\n".join(f"<li>{_esc(i)}</li>" for i in (items or [])) or "<li>—</li>"
+
+
+def _html_synthesis_section(syn: dict) -> str:
+    if not syn:
+        return ""
+    return f"""<section class="card"><h3>Итоговый вердикт</h3><p>{_esc(syn.get('verdict', ''))}</p>
+<h4>Векторы атаки</h4><ul>{_html_li(syn.get('attack_vectors'))}</ul>
+<h4>Приоритетные действия</h4><ul>{_html_li(syn.get('top_actions'))}</ul></section>"""
+
+
+def _html_matrix_section(matrix: list) -> str:
+    rows = "\n".join(
+        f"<tr><td>{_esc(m['cwe'])}</td><td>{_esc(m['severity'])}</td>"
+        f"<td>{m['count']}</td><td>{_esc(m['exploitability'])}</td></tr>"
+        for m in matrix
+    ) or "<tr><td colspan='4'>нет данных</td></tr>"
+    return f"""<section class="card"><h3>Матрица рисков</h3>
+<table><tr><th>CWE</th><th>Тяжесть</th><th>Кол-во</th><th>Эксплуатируемость</th></tr>{rows}</table>
+</section>"""
+
+
+def _html_domain_card(d: dict) -> str:
+    a = d.get("agent") or {}
+    _, dc = _AUDIT_RISK_LABEL.get(a.get("risk_level", "medium"), _AUDIT_RISK_LABEL["medium"])
+    fps = a.get("false_positives") or []
+    fps_html = f"<h4>Ложные срабатывания</h4><ul>{_html_li(fps)}</ul>" if fps else ""
+    return f"""<section class="card">
+  <h3>{_esc(d.get('label', d.get('domain', '?')))}
+      <span class="badge" style="background:{dc}">{_esc(a.get('risk_level', '—'))}</span>
+      <small>{d.get('findings_count', 0)} находок</small></h3>
+  <p>{_esc(a.get('assessment', ''))}</p>
+  <h4>Эксплуатируемость</h4><ul>{_html_li(a.get('exploitability'))}</ul>
+  <h4>Рекомендации</h4><ul>{_html_li(a.get('recommendations'))}</ul>
+  {fps_html}
+</section>"""
+
+
 def generate_audit_html(report: dict) -> str:
     """Статичный HTML-отчёт аудита из готового JSON (детерминированный рендер)."""
     syn = report.get("synthesis") or {}
@@ -289,30 +314,9 @@ def generate_audit_html(report: dict) -> str:
     risk_label, risk_color = _AUDIT_RISK_LABEL.get(risk, _AUDIT_RISK_LABEL["medium"])
     tools = ", ".join(k for k, v in (report.get("tools") or {}).items() if v) or "—"
 
-    def li(items):
-        return "\n".join(f"<li>{_esc(i)}</li>" for i in (items or [])) or "<li>—</li>"
-
-    matrix_rows = "\n".join(
-        f"<tr><td>{_esc(m['cwe'])}</td><td>{_esc(m['severity'])}</td>"
-        f"<td>{m['count']}</td><td>{_esc(m['exploitability'])}</td></tr>"
-        for m in (report.get("matrix") or [])
-    ) or "<tr><td colspan='4'>нет данных</td></tr>"
-
-    domains_html = []
-    for d in (report.get("domains") or []):
-        a = d.get("agent") or {}
-        _, dc = _AUDIT_RISK_LABEL.get(a.get("risk_level", "medium"), _AUDIT_RISK_LABEL["medium"])
-        fps = a.get("false_positives") or []
-        domains_html.append(f"""
-<section class="card">
-  <h3>{_esc(d.get('label', d.get('domain', '?')))}
-      <span class="badge" style="background:{dc}">{_esc(a.get('risk_level', '—'))}</span>
-      <small>{d.get('findings_count', 0)} находок</small></h3>
-  <p>{_esc(a.get('assessment', ''))}</p>
-  <h4>Эксплуатируемость</h4><ul>{li(a.get('exploitability'))}</ul>
-  <h4>Рекомендации</h4><ul>{li(a.get('recommendations'))}</ul>
-  {f"<h4>Ложные срабатывания</h4><ul>{li(fps)}</ul>" if fps else ""}
-</section>""")
+    domains_html = "".join(_html_domain_card(d) for d in (report.get("domains") or []))
+    if not domains_html:
+        domains_html = '<section class="card"><p>Находок нет — аудит чистый.</p></section>'
 
     return f"""<!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8">
@@ -333,15 +337,9 @@ ul {{ margin: 4px 0; padding-left: 20px; }} li {{ margin: 3px 0; font-size: 13px
 Инструменты: {_esc(tools)} · Находок: {report.get('total_findings', 0)}
 (+{report.get('new_findings', 0)} новых / −{report.get('fixed_findings', 0)} исправлено)</p>
 
-{f'''<section class="card"><h3>Итоговый вердикт</h3><p>{_esc(syn.get('verdict', ''))}</p>
-<h4>Векторы атаки</h4><ul>{li(syn.get('attack_vectors'))}</ul>
-<h4>Приоритетные действия</h4><ul>{li(syn.get('top_actions'))}</ul></section>''' if syn else ""}
-
-<section class="card"><h3>Матрица рисков</h3>
-<table><tr><th>CWE</th><th>Тяжесть</th><th>Кол-во</th><th>Эксплуатируемость</th></tr>{matrix_rows}</table>
-</section>
-
-{''.join(domains_html) or '<section class="card"><p>Находок нет — аудит чистый.</p></section>'}
+{_html_synthesis_section(syn)}
+{_html_matrix_section(report.get('matrix') or [])}
+{domains_html}
 <p class="meta">Сформировано CodeCogniLint · детерминированный рендер из JSON отчёта</p>
 </body></html>"""
 

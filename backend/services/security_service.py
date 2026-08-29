@@ -221,68 +221,79 @@ def _scan_secrets_builtin(workspace: str) -> dict:
 
 # ---------------------------------------------------------------------- SCA
 
+def _scan_pip_audit(root: Path, req_files: list[Path], findings: list, notes: list) -> None:
+    if shutil.which("pip-audit") is None:
+        notes.append("pip-audit не установлен (pip install pip-audit)")
+        return
+    for req in req_files:
+        try:
+            proc = _run(["pip-audit", "-r", req.name, "--format", "json",
+                         "--progress-spinner", "off"], cwd=str(root))
+            data = json.loads(proc.stdout or "{}")
+        except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+            notes.append(f"pip-audit ({req.name}): {e}")
+            continue
+        for dep in data.get("dependencies", []):
+            for vuln in dep.get("vulns", []):
+                findings.append(_finding(
+                    tool="pip-audit",
+                    rule_id=vuln.get("id", "?"),
+                    severity="critical" if _is_high_sev(vuln) else "warning",
+                    path=req.name,
+                    line=1,
+                    title=f"{dep.get('name')} {dep.get('version')}: {vuln.get('id')}",
+                    message=(vuln.get("description") or "")[:300],
+                    cwe=None,
+                    snippet=f"fix: {', '.join(vuln.get('fix_versions', []) or ['—'])}",
+                ))
+
+
+def _scan_npm_audit(root: Path, findings: list, notes: list) -> None:
+    if shutil.which("npm") is None:
+        notes.append("npm не найден")
+        return
+    try:
+        proc = _run(["npm", "audit", "--json", "--omit", "dev"], cwd=str(root))
+        data = json.loads(proc.stdout or "{}")
+    except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        notes.append(f"npm audit: {e}")
+        return
+    for name, v in (data.get("vulnerabilities") or {}).items():
+        sev = v.get("severity", "info")
+        via0 = v.get("via")[0] if v.get("via") and isinstance(v["via"][0], dict) else {}
+        findings.append(_finding(
+            tool="npm-audit",
+            rule_id=str(via0.get("source", name)) if via0 else name,
+            severity={"critical": "critical", "high": "critical",
+                      "moderate": "warning", "low": "info"}.get(sev, "info"),
+            path="package-lock.json",
+            line=1,
+            title=f"{name}: {sev}",
+            message=(via0.get("title", "") if via0 else "")[:300],
+            snippet=f"fix: {'npm audit fix' if v.get('fixAvailable') else 'нет автопочинки'}",
+        ))
+
+
 def scan_sca(workspace: str) -> dict:
+    """SCA-скан: уязвимости зависимостей (pip-audit + npm audit)."""
     root = Path(workspace).expanduser().resolve()
-    findings = []
-    notes = []
+    findings: list = []
+    notes: list = []
 
     req_files = [f for f in root.glob("requirements*.txt")]
     if req_files:
-        if shutil.which("pip-audit") is None:
-            notes.append("pip-audit не установлен (pip install pip-audit)")
-        else:
-            for req in req_files:
-                try:
-                    proc = _run(["pip-audit", "-r", req.name, "--format", "json",
-                                 "--progress-spinner", "off"], cwd=str(root))
-                    data = json.loads(proc.stdout or "{}")
-                except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
-                    notes.append(f"pip-audit ({req.name}): {e}")
-                    continue
-                for dep in data.get("dependencies", []):
-                    for vuln in dep.get("vulns", []):
-                        findings.append(_finding(
-                            tool="pip-audit",
-                            rule_id=vuln.get("id", "?"),
-                            severity="critical" if _is_high_sev(vuln) else "warning",
-                            path=req.name,
-                            line=1,
-                            title=f"{dep.get('name')} {dep.get('version')}: {vuln.get('id')}",
-                            message=(vuln.get("description") or "")[:300],
-                            cwe=None,
-                            snippet=f"fix: {', '.join(vuln.get('fix_versions', []) or ['—'])}",
-                        ))
+        _scan_pip_audit(root, req_files, findings, notes)
 
-    if (root / "package-lock.json").exists():
-        if shutil.which("npm") is None:
-            notes.append("npm не найден")
-        else:
-            try:
-                proc = _run(["npm", "audit", "--json", "--omit", "dev"], cwd=str(root))
-                data = json.loads(proc.stdout or "{}")
-                for name, v in (data.get("vulnerabilities") or {}).items():
-                    sev = v.get("severity", "info")
-                    findings.append(_finding(
-                        tool="npm-audit",
-                        rule_id=str((v.get("via") or [{}])[0].get("source", name))
-                            if v.get("via") and isinstance(v["via"][0], dict) else name,
-                        severity={"critical": "critical", "high": "critical",
-                                  "moderate": "warning", "low": "info"}.get(sev, "info"),
-                        path="package-lock.json",
-                        line=1,
-                        title=f"{name}: {sev}",
-                        message=(v.get("via")[0].get("title", "") if v.get("via") and isinstance(v["via"][0], dict) else "")[:300],
-                        snippet=f"fix: {'npm audit fix' if v.get('fixAvailable') else 'нет автопочинки'}",
-                    ))
-            except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
-                notes.append(f"npm audit: {e}")
+    has_npm = (root / "package-lock.json").exists()
+    if has_npm:
+        _scan_npm_audit(root, findings, notes)
 
     status = "ok" if findings or not notes else "partial"
-    out = {"status": status if (findings or req_files or (root / 'package-lock.json').exists()) else "ok",
+    out = {"status": status if (findings or req_files or has_npm) else "ok",
            "findings": findings}
     if notes:
         out["note"] = "; ".join(notes)
-    if not req_files and not (root / "package-lock.json").exists():
+    if not req_files and not has_npm:
         out["note"] = (out.get("note", "") + "; " if out.get("note") else "") + \
             "манифесты зависимостей не найдены"
     return out
