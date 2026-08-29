@@ -1,0 +1,197 @@
+# Вендоренный ruleset качества: производительность + best practices (офлайн).
+# CWE не присваиваем (это не security) — категория в metadata.category.
+rules:
+  # ============ ПРОИЗВОДИТЕЛЬНОСТЬ (Python) ============
+  - id: perf-membership-on-list
+    languages: [python]
+    severity: INFO
+    message: Проверка членства по списку/кортежу O(n) — используйте set для повторных проверок
+    metadata: {category: performance}
+    pattern: |
+      if $X in [$A, ...]:
+        ...
+
+  - id: perf-string-concat-in-loop
+    languages: [python]
+    severity: WARNING
+    message: Конкатенация строк в цикле O(n²) — используйте ''.join() или list.append
+    metadata: {category: performance}
+    patterns:
+      - pattern-inside: |
+          for ... in ...:
+            ...
+      - pattern-either:
+          - pattern: $S += $X
+          - pattern: $S = $S + $X
+      - metavariable-regex:
+          metavariable: $S
+          regex: ^[a-z_][a-z0-9_]*$
+
+  - id: perf-len-in-loop-condition
+    languages: [python]
+    severity: INFO
+    message: Повторный вызов функции в условии цикла — вынесите в переменную
+    metadata: {category: performance}
+    patterns:
+      - pattern: "while $I < $F(...):"
+      - metavariable-regex:
+          metavariable: $F
+          regex: ^(len|int|abs)$
+
+  - id: perf-list-of-generator
+    languages: [python]
+    severity: INFO
+    message: list(...) вокруг генератора без нужды — если нужна одна итерация, используйте генератор напрямую
+    metadata: {category: performance}
+    patterns:
+      - pattern: list($F($X) for $Y in $Z)
+      - metavariable-regex:
+          metavariable: $F
+          regex: ^(sorted|filter|map)$
+
+  - id: perf-sleep-in-async
+    languages: [python]
+    severity: WARNING
+    message: time.sleep в async-функции блокирует event loop — используйте await asyncio.sleep
+    metadata: {category: performance}
+    patterns:
+      - pattern-inside: |
+          async def $F(...):
+            ...
+      - pattern: time.sleep(...)
+
+  - id: perf-sync-requests-in-async
+    languages: [python]
+    severity: WARNING
+    message: Синхронный requests в async-функции блокирует event loop — httpx/AsyncClient или asyncio.to_thread
+    metadata: {category: performance}
+    patterns:
+      - pattern-inside: |
+          async def $F(...):
+            ...
+      - pattern-either:
+          - pattern: requests.get(...)
+          - pattern: requests.post(...)
+          - pattern: requests.put(...)
+          - pattern: requests.delete(...)
+          - pattern: requests.request(...)
+
+  - id: perf-glob-in-loop
+    languages: [python]
+    severity: INFO
+    message: glob/rglob внутри цикла — соберите файлы один раз
+    metadata: {category: performance}
+    patterns:
+      - pattern-inside: |
+          for ... in ...:
+            ...
+      - pattern-either:
+          - pattern: $P.glob(...)
+          - pattern: $P.rglob(...)
+
+  # ============ ПРОИЗВОДИТЕЛЬНОСТЬ (JS/TS/React) ============
+  - id: perf-js-index-as-key
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: index как key в списке — ломает реконсиляцию при перестановках; используйте стабильный id
+    metadata: {category: performance}
+    patterns:
+      - pattern: "key={$I}"
+      - metavariable-regex:
+          metavariable: $I
+          regex: ^(i|idx|index)$
+
+  - id: perf-react-inline-object-prop
+    languages: [typescript, javascript]
+    severity: INFO
+    message: Инлайн-объект/массив в пропсах создаёт новую ссылку каждый рендер — вынесите в useMemo/const
+    metadata: {category: performance}
+    pattern-either:
+      - pattern: "<$C style={{...}} ... />"
+      - pattern: "<$C options={[...]} ... />"
+
+  # ============ BEST PRACTICES (Python) ============
+  - id: bp-mutable-default-arg
+    languages: [python]
+    severity: WARNING
+    message: Изменяемый аргумент по умолчанию разделяется между вызовами — используйте None + присвоение в теле
+    metadata: {category: best-practices}
+    pattern-either:
+      - pattern: |
+          def $F(..., $X = [], ...):
+            ...
+      - pattern: |
+          def $F(..., $X = {}, ...):
+            ...
+      - pattern: |
+          def $F(..., $X = set(), ...):
+            ...
+
+  - id: bp-wildcard-import
+    languages: [python]
+    severity: WARNING
+    message: Импорт через * засоряет пространство имён и скрывает зависимости
+    metadata: {category: best-practices}
+    pattern: from $M import *
+
+  - id: bp-print-in-code
+    languages: [python]
+    severity: INFO
+    message: print в прикладном коде — используйте logging
+    metadata: {category: best-practices}
+    pattern: print(...)
+
+  - id: bp-except-pass
+    languages: [python]
+    severity: WARNING
+    message: except с pass глушит ошибки — логируйте или пробрасывайте
+    metadata: {category: best-practices}
+    patterns:
+      - pattern-inside: |
+          try:
+            ...
+          except ...:
+            ...
+      - pattern: pass
+
+  - id: bp-todo-fixme
+    languages: [python, typescript, javascript]
+    severity: INFO
+    message: Незакрытый TODO/FIXME — заведите задачу или реализуйте
+    metadata: {category: best-practices}
+    patterns:
+      - pattern-regex: "(?i)(#|//)\\s*(TODO|FIXME|HACK|XXX)\\b"
+
+  # ============ BEST PRACTICES (JS/TS) ============
+  - id: bp-js-var
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: var имеет функциональную область видимости и hoisting — используйте const/let
+    metadata: {category: best-practices}
+    pattern: "var $X = ..."
+
+  - id: bp-js-double-equals
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: == с приведением типов — используйте ===
+    metadata: {category: best-practices}
+    patterns:
+      - pattern-either:
+          - pattern: $X == $Y
+          - pattern: $X != $Y
+      - pattern-not: $X == null
+      - pattern-not: $X != null
+
+  - id: bp-js-console-log
+    languages: [typescript, javascript]
+    severity: INFO
+    message: console.log в прикладном коде — уберите или используйте логгер
+    metadata: {category: best-practices}
+    pattern: console.log(...)
+
+  - id: bp-js-any-type
+    languages: [typescript]
+    severity: INFO
+    message: Явный any отключает проверку типов — укажите конкретный тип или unknown
+    metadata: {category: best-practices}
+    pattern: "$X: any"

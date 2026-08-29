@@ -176,6 +176,8 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/pentest/scan`               | Пентест живого приложения (config/fuzz/nuclei + LLM-интерпретация) |
 | POST  | `/api/audit/run?verify=`        | Мульти-агентный аудит (суб-агенты + синтезатор + матрица) |
 | POST  | `/api/audit/html`               | HTML-рендер JSON-отчёта аудита |
+| GET   | `/api/quality/tools`            | Доступность движков качества (semgrep/radon) |
+| POST  | `/api/quality/scan?review=`     | Качество: производительность + размер + best practices |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -207,7 +209,8 @@ CodeCogniLint/
 │   │   ├── review.py                 # /review: агент код-ревью (file, changes)
 │   │   ├── security.py               # /security: tools + scan + sarif + baseline
 │   │   ├── pentest.py                # /pentest: DAST по URL (config/fuzz/nuclei)
-│   │   ├── audit.py                  # /audit: мульти-агентный аудит
+│   │   ├── audit.py                  # /audit: мульти-агентный аудит + HTML
+│   │   ├── quality.py                # /quality: производительность/размер/практики
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   ├── security/
 │   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
@@ -218,6 +221,7 @@ CodeCogniLint/
 │       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор + baseline/sarif
 │       ├── pentest_service.py        # DAST: config-checks, schemathesis, nuclei, LLM-интерпретация
 │       ├── audit_agent.py            # оркестратор аудита: домены, суб-агенты, синтезатор
+│       ├── quality_service.py        # качество: semgrep-правила, метрики LOC/CC, hotspots
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
@@ -233,7 +237,8 @@ CodeCogniLint/
 │       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
 │       │   ├── SecurityPanel.tsx     # security-скан + пентест + аудит (переключатель)
 │       │   ├── PentestView.tsx       # DAST: цель, слои, риск, рекомендации
-│       │   ├── AuditView.tsx         # аудит: вердикт, домены, матрица рисков
+│       │   ├── AuditView.tsx         # аудит: домены, синтез, матрица рисков, HTML-экспорт
+│       │   ├── QualityPanel.tsx      # качество: метрики, hotspots, находки
 │       │   ├── ReviewTab.tsx         # агент код-ревью: вердикт, issues, positives
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
 │       │   ├── AIPanel.tsx           # вкладки: scope + Ревью + Чат
@@ -299,6 +304,7 @@ CodeCogniLint/
 - PR-интеграция: создание GitHub PR из UI (push + API), LLM-генерация заголовка/описания по diff
 - HTML-экспорт отчёта аудита (детерминированный рендер)
 - Настройки LLM: валидация до записи + атомарная перезапись .env
+- **Качество кода** — отдельный слой: semgrep-паттерны производительности и best practices (python/js/ts), метрики размера (LOC, длина функций, цикломатическая сложность через radon), рейтинг hotspot'ов, опциональный LLM-разбор топ-hotspot'ов
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

@@ -4,14 +4,15 @@ import {
   faDatabase, faFolderOpen,
   faXmark, faTriangleExclamation, faPlus, faPencil, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport } from '../types';
+import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, QualityReport } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
 import { SecurityPanel } from './SecurityPanel';
+import { QualityPanel } from './QualityPanel';
 
 interface Props {
-  panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
+  panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
   workspace: WorkspaceInfo | null;
   tree: TreeNode | null;
   activeFile: string | null;
@@ -50,6 +51,12 @@ interface Props {
   auditError: string | null;
   onAuditRun: (verify: boolean) => void;
   onAuditExportHtml: () => void;
+  // Качество кода
+  qualityTools: Record<string, boolean> | null;
+  qualityReport: QualityReport | null;
+  qualityScanning: boolean;
+  qualityError: string | null;
+  onQualityScan: (review: boolean) => void;
 }
 
 const categoryColor: Record<string, string> = {
@@ -277,6 +284,20 @@ export function Sidebar(props: Props) {
         auditError={props.auditError}
         onAuditRun={props.onAuditRun}
         onAuditExportHtml={props.onAuditExportHtml}
+      />
+    );
+  }
+
+  if (panel === 'quality') {
+    return (
+      <QualityPanel
+        hasWorkspace={workspace !== null}
+        tools={props.qualityTools}
+        report={props.qualityReport}
+        scanning={props.qualityScanning}
+        error={props.qualityError}
+        onScan={props.onQualityScan}
+        onOpenFinding={props.onOpenFinding}
       />
     );
   }

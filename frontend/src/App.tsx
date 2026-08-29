@@ -22,9 +22,10 @@ import { useReview } from './hooks/useReview';
 import { useSecurity } from './hooks/useSecurity';
 import { usePentest } from './hooks/usePentest';
 import { useAudit } from './hooks/useAudit';
+import { useQuality } from './hooks/useQuality';
 import type { OpenTab, Rule, RuleCategory, Violation } from './types';
 
-type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
+type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
 
 interface PendingRule {
   code: string;
@@ -86,6 +87,10 @@ export default function App() {
   const {
     report: auditReport, running: auditRunning, error: auditError, run: runAudit, exportHtml: exportAuditHtml,
   } = useAudit(workspace?.path ?? null);
+  const {
+    tools: qualityTools, report: qualityReport,
+    scanning: qualityScanning, error: qualityError, runScan: runQualityScan,
+  } = useQuality(workspace?.path ?? null);
 
   const activeTab = tabs[activeTabIndex] ?? null;
   const violations: Violation[] = activeTab ? (resultsByFile[activeTab.path]?.violations ?? []) : [];
@@ -447,6 +452,11 @@ export default function App() {
           auditError={auditError}
           onAuditRun={runAudit}
           onAuditExportHtml={exportAuditHtml}
+          qualityTools={qualityTools}
+          qualityReport={qualityReport}
+          qualityScanning={qualityScanning}
+          qualityError={qualityError}
+          onQualityScan={runQualityScan}
         />
 
         <EditorPane

@@ -1,10 +1,10 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFileCode, faSearch, faCodeMerge,
-  faCog, faList, faShieldHalved,
+  faCog, faList, faShieldHalved, faGaugeHigh,
 } from '@fortawesome/free-solid-svg-icons';
 
-type Panel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security';
+type Panel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
 
 interface Props {
   activePanel: Panel;
@@ -16,6 +16,7 @@ const items: { panel: Panel; icon: typeof faFileCode; label: string }[] = [
   { panel: 'search', icon: faSearch, label: 'Поиск' },
   { panel: 'git', icon: faCodeMerge, label: 'Git' },
   { panel: 'security', icon: faShieldHalved, label: 'Безопасность' },
+  { panel: 'quality', icon: faGaugeHigh, label: 'Качество' },
   { panel: 'rules', icon: faList, label: 'Правила' },
   { panel: 'settings', icon: faCog, label: 'Настройки' },
 ];
@@ -23,7 +24,7 @@ const items: { panel: Panel; icon: typeof faFileCode; label: string }[] = [
 export function ActivityBar({ activePanel, onSelect }: Props) {
   return (
     <nav className="w-12 border-r border-[#30363d] bg-[#0d1117] flex flex-col items-center py-4 space-y-6 text-gray-500 flex-shrink-0">
-      {items.slice(0, 5).map(({ panel, icon, label }) => (
+      {items.slice(0, 6).map(({ panel, icon, label }) => (
         <button
           key={panel}
           title={label}

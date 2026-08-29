@@ -148,6 +148,55 @@ export interface PrResult {
   created: boolean;  // false = PR уже существовал
 }
 
+// ---- Качество кода (производительность / размер / best practices) ----
+export interface QualityFinding {
+  id: string;
+  tool: string;
+  rule_id: string;
+  severity: 'critical' | 'warning' | 'info';
+  path: string;
+  line_start: number;
+  line_end: number;
+  title: string;
+  snippet: string;
+  category?: 'performance' | 'best-practices';
+  suppressed?: boolean;
+}
+
+export interface QualityMetrics {
+  total_code_files: number;
+  total_loc: number;
+  big_files: { path: string; loc: number; bytes: number }[];
+  long_functions: { file: string; name: string; line: number; loc: number }[];
+  complex_functions: { file: string; name: string; line: number; cc: number }[];
+  top_files: { path: string; loc: number; bytes: number }[];
+  thresholds: { file_loc: number; func_loc: number; func_cc: number };
+}
+
+export interface QualityHotspot {
+  path: string;
+  score: number;
+  reasons: string[];
+  llm?: {
+    assessment: string;
+    perf_risks: string[];
+    simplification_steps: string[];
+  } | null;
+}
+
+export interface QualityReport {
+  workspace: string;
+  scanned_at: string;
+  tools: Record<string, boolean>;
+  layers: Record<string, { status: string; count?: number; scanned_files?: number }>;
+  metrics: QualityMetrics;
+  hotspots: QualityHotspot[];
+  total_findings: number;
+  by_category: Record<string, number>;
+  by_severity: Record<string, number>;
+  findings: QualityFinding[];
+}
+
 export interface GitCommitResult {
   hash: string;
   message: string;

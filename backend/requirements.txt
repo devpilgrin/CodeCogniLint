@@ -10,3 +10,4 @@ openpyxl==3.1.5
 semgrep==1.175.0
 pip-audit==2.9.0
 schemathesis==4.25.2
+radon==6.0.1

@@ -4,6 +4,7 @@ import type {
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
   ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, PrResult,
+  QualityReport,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -109,4 +110,10 @@ export const auditApi = {
     api.post<AuditReport>('/audit/run', null, { params: { verify } }).then(r => r.data),
   html: (report: AuditReport) =>
     api.post('/audit/html', report, { responseType: 'blob' }).then(r => r.data as Blob),
+};
+
+export const qualityApi = {
+  tools: () => api.get<Record<string, boolean>>('/quality/tools').then(r => r.data),
+  scan: (review: boolean) =>
+    api.post<QualityReport>('/quality/scan', null, { params: { review } }).then(r => r.data),
 };

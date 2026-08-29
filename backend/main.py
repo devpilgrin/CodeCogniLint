@@ -4,7 +4,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
-from routers import rules, analysis, settings, workspace, reports, gitops, review, security, pentest, audit
+from routers import rules, analysis, settings, workspace, reports, gitops, review, security, pentest, audit, quality
 
 app = FastAPI(title="CodeCogniLint API", version="1.0.0")
 
@@ -85,6 +85,7 @@ app.include_router(review.router, prefix="/api")
 app.include_router(security.router, prefix="/api")
 app.include_router(pentest.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+app.include_router(quality.router, prefix="/api")
 
 # Коды ошибок, которые любой эндпоинт может вернуть — документируем глобально,
 # чтобы OpenAPI-схема соответствовала реальности (status_code_conformance).
