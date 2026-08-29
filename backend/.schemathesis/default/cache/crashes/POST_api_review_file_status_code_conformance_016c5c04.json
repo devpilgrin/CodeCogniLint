@@ -1,0 +1,82 @@
+{
+  "operation": "POST /api/review/file",
+  "method": "POST",
+  "path_template": "/api/review/file",
+  "fingerprint": "016c5c04",
+  "case_id": "MJROFv",
+  "code_sample": "curl -X POST -H 'Content-Type: application/json' -d '{\"file_path\": \"\", \"content\": \"\"}' http://127.0.0.1:8901/api/review/file",
+  "sequence": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8901/api/review/file",
+      "url_template": "http://127.0.0.1:8901/api/review/file",
+      "headers": {
+        "User-Agent": "schemathesis/4.25.2",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "MJROFv",
+        "Content-Type": "application/json",
+        "Content-Length": "32"
+      },
+      "response": {
+        "status_code": 400,
+        "headers": {
+          "date": "Sat, 29 Aug 2026 13:53:09 GMT",
+          "server": "uvicorn",
+          "content-length": "68",
+          "content-type": "application/json"
+        },
+        "body": "{\"detail\":\"\u041f\u0443\u0441\u0442\u043e\u0439 \u0444\u0430\u0439\u043b \u2014 \u043d\u0435\u0447\u0435\u0433\u043e \u0440\u0435\u0432\u044c\u044e\u0438\u0442\u044c\"}"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "status_code_conformance",
+          "status": "failure",
+          "message": "Undocumented HTTP status code\n\nReceived: 400\nDocumented: 200, 422"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 0.00010537100024521351,
+          "mode": "positive"
+        },
+        "components": {
+          "BODY": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Valid object",
+            "location": null,
+            "parameter": "application/json",
+            "parameter_location": "BODY",
+            "scenario": "valid_object"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/api/review/file",
+      "path_parameters": {},
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "json",
+        "value": {
+          "file_path": "",
+          "content": ""
+        }
+      },
+      "media_type": "application/json",
+      "parent_index": null
+    }
+  ]
+}

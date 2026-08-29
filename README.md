@@ -17,6 +17,7 @@
 - **Агент код-ревью** — специализированный LLM-ревьюер: вердикт (одобрено / комментарии / требуются правки), замечания с категориями (баг / безопасность / производительность / стиль / поддерживаемость) и привязкой к строкам, сильные стороны кода; режимы: текущий файл и незакоммиченные изменения (git)
 - **Security-скан (SAST/SCA)** — детерминированный слой: Semgrep с вендоренными правилами (CWE/OWASP-метаданные, офлайн), поиск секретов (gitleaks или встроенные regex), уязвимости зависимостей (pip-audit / npm audit); опциональный второй проход — LLM-верификатор подтверждает/опровергает находки
 - **Дисциплина анализа** — suppression-комментарии `# ccl:ignore [rule]`, baseline/diff находок между сканами (новые / исправленные), метрики покрытия (сколько файлов реально проанализировано), экспорт SARIF 2.1.0 для GitHub Code Scanning; security-gate в CI (semgrep --error + pip-audit)
+- **Пентест-контур (DAST)** — проверки живого приложения по URL: security-заголовки, CORS (отражение Origin, `*`+credentials), TRACE, открытые .env/.git/docs; фаззинг API по OpenAPI (schemathesis, junit-парсинг отчёта); nuclei при наличии; опциональная LLM-интерпретация (уровень риска + приоритизированные рекомендации)
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -169,6 +170,8 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/security/scan?verify=`      | Security-скан: SAST + секреты + SCA (+LLM-верификация) |
 | POST  | `/api/security/sarif`             | SARIF 2.1.0-экспорт скана                 |
 | GET/POST/DELETE | `/api/security/baseline` | Baseline находок: инфо / сохранить / удалить |
+| GET   | `/api/pentest/tools`              | Доступность DAST-инструментов             |
+| POST  | `/api/pentest/scan`               | Пентест живого приложения (config/fuzz/nuclei + LLM-интерпретация) |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -198,7 +201,8 @@ CodeCogniLint/
 │   │   ├── workspace.py              # open/clone/tree/file/browse + сохранение файла
 │   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log
 │   │   ├── review.py                 # /review: агент код-ревью (file, changes)
-│   │   ├── security.py               # /security: tools + scan (SAST/секреты/SCA)
+│   │   ├── security.py               # /security: tools + scan + sarif + baseline
+│   │   ├── pentest.py                # /pentest: DAST по URL (config/fuzz/nuclei)
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   ├── security/
 │   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
@@ -206,7 +210,8 @@ CodeCogniLint/
 │       ├── llm_adapter.py            # LLMError + friendly error mapping
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
 │       ├── review_agent.py           # агент код-ревью: вердикт, issues, positives
-│       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор
+│       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор + baseline/sarif
+│       ├── pentest_service.py        # DAST: config-checks, schemathesis, nuclei, LLM-интерпретация
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
@@ -220,7 +225,8 @@ CodeCogniLint/
 │       │   ├── ActivityBar.tsx
 │       │   ├── Sidebar.tsx           # explorer / git / security / rules / settings
 │       │   ├── GitPanel.tsx          # статус ветки, изменения, commit/push/pull, история
-│       │   ├── SecurityPanel.tsx     # security-скан: находки, CWE, верификация
+│       │   ├── SecurityPanel.tsx     # security-скан + пентест (переключатель SAST/DAST)
+│       │   ├── PentestView.tsx       # DAST: цель, слои, риск, рекомендации
 │       │   ├── ReviewTab.tsx         # агент код-ревью: вердикт, issues, positives
 │       │   ├── EditorPane.tsx        # Monaco + контекстное меню + маркеры
 │       │   ├── AIPanel.tsx           # вкладки: scope + Ревью + Чат
@@ -236,6 +242,7 @@ CodeCogniLint/
 │       │   ├── useGit.ts             # статус/commit/push/pull + уведомления
 │       │   ├── useReview.ts          # агент код-ревью (file / changes)
 │       │   ├── useSecurity.ts        # security-скан + статус инструментов
+│       │   ├── usePentest.ts         # DAST-скан цели по URL
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
@@ -260,8 +267,9 @@ CodeCogniLint/
 - **Детерминированный security-слой** — Semgrep с вендоренным набором правил (`security/semgrep-rules.yml`, CWE/OWASP-метаданные, работает офлайн без реестра); секреты — gitleaks при наличии, иначе встроенные regex; SCA — pip-audit по `requirements*.txt` и npm audit по `package-lock.json`. Каждый слой деградирует независимо (`status: unavailable` без падения отчёта)
 - **LLM — верификатор, не детектор** — топ-10 находок (по severity) вторым проходом подтверждаются/опровергаются LLM с контекстом кода (`confirmed` / `false_positive` + обоснование); модель не ищет уязвимости сама — это устраняет галлюцинации и пропуски
 - **Suppression** — комментарий `# ccl:ignore [rule_id|CWE]` на строке находки или строкой выше подавляет её во всех слоях; подавленные видны в отчёте серым, в SARIF не попадают, в baseline не сохраняются
-- **Baseline/diff** — fingerprint находки = sha1(правило + путь + заголовок), переживает сдвиг строк; скан при сохранённом baseline помечает `NEW` и считает исправленные
+- **Baseline/diff** — fingerprint находки = sha256(правило + путь + заголовок), переживает сдвиг строк; скан при сохранённом baseline помечает `NEW` и считает исправленные
 - **Security-gate в CI** — semgrep с вендоренными правилами роняет сборку на любой находке; pip-audit с задокументированными `--ignore-vuln` (click/mcp — жёстко запиненный рантайм semgrep); npm audit — совещательно
+- **DAST-пентест** — встроенные config-checks (заголовки/CORS/TRACE/.env/.git) без зависимостей; фаззинг API через schemathesis по `/openapi.json` с junit-парсингом; nuclei — feature-detect. Синхронные HTTP и CLI вынесены в потоки (`asyncio.to_thread`), иначе самосканирование блокирует event loop
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -276,6 +284,7 @@ CodeCogniLint/
 - Агент код-ревью: вердикт + замечания по строкам + сильные стороны (файл и git-изменения)
 - Security-скан: Semgrep (CWE/OWASP), секреты, уязвимые зависимости + LLM-верификация
 - Suppression `# ccl:ignore`, baseline/diff находок, метрики покрытия, SARIF-экспорт
+- Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
 - Security-gate в CI (semgrep + pip-audit с документированными исключениями)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

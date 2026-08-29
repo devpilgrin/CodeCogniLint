@@ -3,7 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo,
+  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -92,4 +92,12 @@ export const securityApi = {
     api.delete<{ removed: boolean }>('/security/baseline').then(r => r.data),
   sarif: () =>
     api.post('/security/sarif', null, { responseType: 'blob' }).then(r => r.data as Blob),
+};
+
+export const pentestApi = {
+  tools: () => api.get<Record<string, boolean>>('/pentest/tools').then(r => r.data),
+  scan: (url: string, fuzz: boolean, configChecks: boolean, interpret: boolean) =>
+    api.post<PentestReport>('/pentest/scan', {
+      url, fuzz, config_checks: configChecks, interpret,
+    }).then(r => r.data),
 };

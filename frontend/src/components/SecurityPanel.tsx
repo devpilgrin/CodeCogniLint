@@ -5,7 +5,8 @@ import {
   faCheckCircle, faCircleQuestion, faXmark, faBookmark, faFileExport,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { SecurityFinding, SecurityReport, SecurityBaselineInfo } from '../types';
+import type { SecurityFinding, SecurityReport, SecurityBaselineInfo, PentestReport } from '../types';
+import { PentestView } from './PentestView';
 
 interface Props {
   hasWorkspace: boolean;
@@ -20,6 +21,13 @@ interface Props {
   onDropBaseline: () => void;
   onDownloadSarif: () => void;
   onOpenFinding: (path: string, line: number) => void;
+  // Pentest (DAST)
+  pentestTools: Record<string, boolean> | null;
+  pentestReport: PentestReport | null;
+  pentestScanning: boolean;
+  pentestError: string | null;
+  onPentestLoadTools: () => void;
+  onPentestScan: (url: string, fuzz: boolean, configChecks: boolean, interpret: boolean) => void;
 }
 
 const sevBadge: Record<SecurityFinding['severity'], string> = {
@@ -53,8 +61,13 @@ const TOOL_NAMES: [string, string][] = [
 ];
 
 export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning, busyBaseline, error,
-  onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding }: Props) {
+  onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding,
+  pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan }: Props) {
   const [verify, setVerify] = useState(true);
+  const [view, setView] = useState<'code' | 'pentest'>('code');
+
+  // Пентест не требует открытого workspace — цель задаётся URL
+  const pentestMode = view === 'pentest';
 
   return (
     <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
@@ -62,14 +75,42 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
         Безопасность
       </div>
 
-      {!hasWorkspace && (
+      {/* Переключатель SAST / DAST */}
+      <div className="flex mx-3 mb-2 rounded overflow-hidden border border-[#30363d] text-[10px] font-semibold flex-shrink-0">
+        <button
+          onClick={() => setView('code')}
+          className={`flex-1 py-1 transition-colors ${view === 'code' ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          Скан кода
+        </button>
+        <button
+          onClick={() => setView('pentest')}
+          className={`flex-1 py-1 transition-colors ${view === 'pentest' ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
+          title="Пентест работающего приложения"
+        >
+          Пентест
+        </button>
+      </div>
+
+      {pentestMode && (
+        <PentestView
+          tools={pentestTools}
+          report={pentestReport}
+          scanning={pentestScanning}
+          error={pentestError}
+          loadTools={onPentestLoadTools}
+          onScan={onPentestScan}
+        />
+      )}
+
+      {!pentestMode && !hasWorkspace && (
         <div className="p-4 text-center">
           <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
           <p className="text-xs text-gray-500">Откройте проект,<br />чтобы запустить сканирование</p>
         </div>
       )}
 
-      {hasWorkspace && (
+      {!pentestMode && hasWorkspace && (
         <>
           {/* Tools availability */}
           {tools && (

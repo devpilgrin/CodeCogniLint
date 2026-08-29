@@ -1,0 +1,85 @@
+{
+  "operation": "POST /api/rules",
+  "method": "OPTIONS",
+  "path_template": "/api/rules",
+  "fingerprint": "51d35272",
+  "case_id": "HyNxeN",
+  "code_sample": "curl -X OPTIONS -H 'Content-Type: application/json' -d '{\"category\": \"syntax\", \"description\": \"000\", \"pattern_description\": \"000\", \"enabled\": true}' http://127.0.0.1:8901/api/rules",
+  "sequence": [
+    {
+      "method": "OPTIONS",
+      "url": "http://127.0.0.1:8901/api/rules",
+      "url_template": "http://127.0.0.1:8901/api/rules",
+      "headers": {
+        "User-Agent": "schemathesis/4.25.2",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "HyNxeN",
+        "Content-Type": "application/json",
+        "Content-Length": "91"
+      },
+      "response": {
+        "status_code": 405,
+        "headers": {
+          "date": "Sat, 29 Aug 2026 13:53:09 GMT",
+          "server": "uvicorn",
+          "allow": "GET",
+          "content-length": "31",
+          "content-type": "application/json"
+        },
+        "body": "{\"detail\":\"Method Not Allowed\"}"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "allow_header_conformance",
+          "status": "failure",
+          "message": "Invalid Allow header\n\n`Allow` header does not match the schema \u2014 missing documented methods: POST\n\nList exactly the methods this resource supports in `Allow`"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 1.3399985618889332e-06,
+          "mode": "negative"
+        },
+        "components": {
+          "BODY": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Unspecified HTTP method: OPTIONS",
+            "location": null,
+            "parameter": null,
+            "parameter_location": null,
+            "scenario": "unspecified_http_method"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/api/rules",
+      "path_parameters": {},
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "json",
+        "value": {
+          "category": "syntax",
+          "description": "000",
+          "pattern_description": "000",
+          "enabled": true
+        }
+      },
+      "media_type": "application/json",
+      "parent_index": null
+    }
+  ]
+}

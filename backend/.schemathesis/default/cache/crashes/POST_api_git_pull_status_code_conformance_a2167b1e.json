@@ -1,0 +1,81 @@
+{
+  "operation": "POST /api/git/pull",
+  "method": "POST",
+  "path_template": "/api/git/pull",
+  "fingerprint": "a2167b1e",
+  "case_id": "f8zELh",
+  "code_sample": "curl -X POST -H 'Content-Type: application/json' -d '{\"token\": \"\"}' http://127.0.0.1:8901/api/git/pull",
+  "sequence": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8901/api/git/pull",
+      "url_template": "http://127.0.0.1:8901/api/git/pull",
+      "headers": {
+        "User-Agent": "schemathesis/4.25.2",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "f8zELh",
+        "Content-Type": "application/json",
+        "Content-Length": "13"
+      },
+      "response": {
+        "status_code": 400,
+        "headers": {
+          "date": "Sat, 29 Aug 2026 13:53:09 GMT",
+          "server": "uvicorn",
+          "content-length": "91",
+          "content-type": "application/json"
+        },
+        "body": "{\"detail\":\"\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0435\u043a\u0442 \u043d\u0435 \u044f\u0432\u043b\u044f\u0435\u0442\u0441\u044f git-\u0440\u0435\u043f\u043e\u0437\u0438\u0442\u043e\u0440\u0438\u0435\u043c\"}"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "status_code_conformance",
+          "status": "failure",
+          "message": "Undocumented HTTP status code\n\nReceived: 400\nDocumented: 200, 422"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 5.2549999963957816e-05,
+          "mode": "positive"
+        },
+        "components": {
+          "BODY": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Object with valid 'token' value: Valid string",
+            "location": null,
+            "parameter": "application/json",
+            "parameter_location": "BODY",
+            "scenario": "valid_object"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/api/git/pull",
+      "path_parameters": {},
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "json",
+        "value": {
+          "token": "[Filtered]"
+        }
+      },
+      "media_type": "application/json",
+      "parent_index": null
+    }
+  ]
+}

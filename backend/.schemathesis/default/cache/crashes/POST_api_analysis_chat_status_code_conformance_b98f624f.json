@@ -1,0 +1,82 @@
+{
+  "operation": "POST /api/analysis/chat",
+  "method": "POST",
+  "path_template": "/api/analysis/chat",
+  "fingerprint": "b98f624f",
+  "case_id": "SfrYHM",
+  "code_sample": "curl -X POST -H 'Content-Type: application/json' -d '{\"messages\": [], \"context\": \"\"}' http://127.0.0.1:8901/api/analysis/chat",
+  "sequence": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8901/api/analysis/chat",
+      "url_template": "http://127.0.0.1:8901/api/analysis/chat",
+      "headers": {
+        "User-Agent": "schemathesis/4.25.2",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "SfrYHM",
+        "Content-Type": "application/json",
+        "Content-Length": "31"
+      },
+      "response": {
+        "status_code": 400,
+        "headers": {
+          "date": "Sat, 29 Aug 2026 13:53:07 GMT",
+          "server": "uvicorn",
+          "content-length": "69",
+          "content-type": "application/json"
+        },
+        "body": "{\"detail\":\"\u041f\u0443\u0441\u0442\u043e\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f\"}"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "status_code_conformance",
+          "status": "failure",
+          "message": "Undocumented HTTP status code\n\nReceived: 400\nDocumented: 200, 422"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 0.000542052999662701,
+          "mode": "positive"
+        },
+        "components": {
+          "BODY": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Object with valid 'context' value: Valid string",
+            "location": null,
+            "parameter": "application/json",
+            "parameter_location": "BODY",
+            "scenario": "valid_object"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/api/analysis/chat",
+      "path_parameters": {},
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "json",
+        "value": {
+          "messages": [],
+          "context": ""
+        }
+      },
+      "media_type": "application/json",
+      "parent_index": null
+    }
+  ]
+}

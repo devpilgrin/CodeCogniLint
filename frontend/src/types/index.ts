@@ -220,6 +220,32 @@ export interface SecurityBaselineInfo {
   findings: number;
 }
 
+// ---- Pentest (волна 3: DAST) ----
+export interface PentestFinding {
+  id: string;
+  layer: 'config' | 'fuzz' | 'nuclei';
+  check: string;
+  severity: 'critical' | 'warning' | 'info';
+  cwe: string | null;
+  endpoint: string;
+  title: string;
+  message: string;
+  evidence: string;
+}
+
+export interface PentestReport {
+  target: string;
+  tools: Record<string, boolean>;
+  layers: Record<string, { status: string; count: number; reason?: string; cases?: number }>;
+  summary: { total: number; by_severity: Record<'critical' | 'warning' | 'info', number> };
+  interpretation: {
+    overall_risk: 'low' | 'medium' | 'high' | 'critical';
+    summary: string;
+    recommendations: string[];
+  } | null;
+  findings: PentestFinding[];
+}
+
 export interface SecurityReport {
   tools: Record<string, boolean>;
   layers: { semgrep: SecurityLayerInfo; secrets: SecurityLayerInfo; sca: SecurityLayerInfo };

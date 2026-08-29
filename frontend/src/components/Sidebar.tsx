@@ -4,7 +4,7 @@ import {
   faDatabase, faFolderOpen,
   faXmark, faTriangleExclamation, faPlus, faPencil, faTrash,
 } from '@fortawesome/free-solid-svg-icons';
-import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo } from '../types';
+import type { Rule, AnalysisResult, TreeNode, WorkspaceInfo, SecurityReport, SecurityBaselineInfo, PentestReport } from '../types';
 import { settingsApi } from '../services/api';
 import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
@@ -37,6 +37,13 @@ interface Props {
   onSecurityDropBaseline: () => void;
   onSecuritySarif: () => void;
   onOpenFinding: (path: string, line: number) => void;
+  // Pentest (DAST)
+  pentestTools: Record<string, boolean> | null;
+  pentestReport: PentestReport | null;
+  pentestScanning: boolean;
+  pentestError: string | null;
+  onPentestLoadTools: () => void;
+  onPentestScan: (url: string, fuzz: boolean, configChecks: boolean, interpret: boolean) => void;
 }
 
 const categoryColor: Record<string, string> = {
@@ -253,6 +260,12 @@ export function Sidebar(props: Props) {
         onDropBaseline={props.onSecurityDropBaseline}
         onDownloadSarif={props.onSecuritySarif}
         onOpenFinding={props.onOpenFinding}
+        pentestTools={props.pentestTools}
+        pentestReport={props.pentestReport}
+        pentestScanning={props.pentestScanning}
+        pentestError={props.pentestError}
+        onPentestLoadTools={props.onPentestLoadTools}
+        onPentestScan={props.onPentestScan}
       />
     );
   }
