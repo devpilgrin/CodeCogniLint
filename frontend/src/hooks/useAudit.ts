@@ -37,5 +37,23 @@ export function useAudit(workspacePath: string | null) {
     setError(null);
   }, []);
 
-  return { report, running, error, run, clear };
+  const exportHtml = useCallback(async (): Promise<boolean> => {
+    if (!report) return false;
+    setError(null);
+    try {
+      const blob = await auditApi.html(report);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'audit-report.html';
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (e) {
+      setError(errText(e));
+      return false;
+    }
+  }, [report]);
+
+  return { report, running, error, run, clear, exportHtml };
 }

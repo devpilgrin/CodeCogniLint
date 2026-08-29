@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { gitApi } from '../services/api';
-import type { GitStatus, GitLogEntry } from '../types';
+import type { GitStatus, GitLogEntry, PrResult } from '../types';
 
-export type GitOp = 'refresh' | 'commit' | 'push' | 'pull' | null;
+export type GitOp = 'refresh' | 'commit' | 'push' | 'pull' | 'pr' | null;
 
 export interface GitNotice {
   kind: 'ok' | 'err';
@@ -109,5 +109,25 @@ export function useGit(workspacePath: string | null) {
     }
   }, [refresh]);
 
-  return { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull };
+  const doCreatePr = useCallback(async (
+    title: string, body: string, base: string, withLlm: boolean,
+  ): Promise<PrResult | null> => {
+    setBusy('pr');
+    try {
+      const r = await gitApi.createPr(title, body, base, withLlm);
+      setNotice({
+        kind: 'ok',
+        text: r.created ? `PR #${r.number} создан` : `PR #${r.number} уже существует`,
+      });
+      await refresh();
+      return r;
+    } catch (e) {
+      setNotice({ kind: 'err', text: errText(e) });
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }, [refresh]);
+
+  return { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr };
 }

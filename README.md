@@ -163,7 +163,8 @@ LLM_API_KEY=lm-studio
 | GET   | `/api/git/diff?path=...`          | Unified diff (файл или весь проект)       |
 | POST  | `/api/git/commit`                 | Коммит (все изменения или выбранные пути) |
 | POST  | `/api/git/push`                   | Push в origin (токен из запроса или .env) |
-| POST  | `/api/git/pull`                   | Pull (--ff-only)                          |
+| POST  | `/api/git/pull`                 | git pull --ff-only                        |
+| POST  | `/api/git/pr`                   | Создать GitHub PR (push + API, LLM-описание опционально) |
 | GET   | `/api/git/log?limit=...`          | Последние коммиты                         |
 | POST  | `/api/review/file`                | Агент код-ревью: ревью одного файла       |
 | POST  | `/api/review/changes`             | Ревью незакоммиченных изменений (git)     |
@@ -173,7 +174,8 @@ LLM_API_KEY=lm-studio
 | GET/POST/DELETE | `/api/security/baseline` | Baseline находок: инфо / сохранить / удалить |
 | GET   | `/api/pentest/tools`              | Доступность DAST-инструментов             |
 | POST  | `/api/pentest/scan`               | Пентест живого приложения (config/fuzz/nuclei + LLM-интерпретация) |
-| POST  | `/api/audit/run?verify=`          | Мульти-агентный аудит (домены + синтезатор + матрица рисков) |
+| POST  | `/api/audit/run?verify=`        | Мульти-агентный аудит (суб-агенты + синтезатор + матрица) |
+| POST  | `/api/audit/html`               | HTML-рендер JSON-отчёта аудита |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
 | POST  | `/api/rules/generate`             | Сгенерировать из фрагмента кода (LLM)     |
@@ -294,6 +296,9 @@ CodeCogniLint/
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
 - Мульти-агентный аудит: суб-агенты по доменам + синтезатор + матрица рисков (CWE)
 - API-гигиена: security-заголовки, документированные коды/типы ответов, устойчивость к фаззингу (собственный пентест: 35 → 0 дефектов корректности)
+- PR-интеграция: создание GitHub PR из UI (push + API), LLM-генерация заголовка/описания по diff
+- HTML-экспорт отчёта аудита (детерминированный рендер)
+- Настройки LLM: валидация до записи + атомарная перезапись .env
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

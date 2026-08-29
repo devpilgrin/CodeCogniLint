@@ -3,8 +3,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCodeBranch, faRotate, faArrowUp, faArrowDown,
   faCloudArrowUp, faCloudArrowDown, faFolderOpen, faTriangleExclamation,
+  faCodePullRequest, faArrowUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
-import type { WorkspaceInfo, GitChangedFile } from '../types';
+import type { WorkspaceInfo, GitChangedFile, PrResult } from '../types';
 import { useGit } from '../hooks/useGit';
 
 interface Props {
@@ -29,13 +30,24 @@ const statusTitle: Record<GitChangedFile['status'], string> = {
 };
 
 export function GitPanel({ workspace, onFileOpen }: Props) {
-  const { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull } =
+  const { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr } =
     useGit(workspace?.path ?? null);
   const [message, setMessage] = useState('');
+  const [prOpen, setPrOpen] = useState(false);
+  const [prTitle, setPrTitle] = useState('');
+  const [prBody, setPrBody] = useState('');
+  const [prBase, setPrBase] = useState('main');
+  const [prLlm, setPrLlm] = useState(true);
+  const [prResult, setPrResult] = useState<PrResult | null>(null);
 
   const handleCommit = async () => {
     const ok = await doCommit(message);
     if (ok) setMessage('');
+  };
+
+  const handlePr = async () => {
+    const r = await doCreatePr(prTitle, prBody, prBase.trim() || 'main', prLlm);
+    if (r) setPrResult(r);
   };
 
   return (
@@ -144,6 +156,71 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
             >
               {busy === 'commit' ? 'Коммит...' : `Коммит (${status.changed.length})`}
             </button>
+          </div>
+
+          {/* Pull Request */}
+          <div className="px-2 mt-2">
+            <button
+              onClick={() => setPrOpen(o => !o)}
+              className="w-full text-[10px] py-1.5 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-purple-500/50 hover:text-purple-300 transition-colors flex items-center justify-center"
+              title="Создать Pull Request на GitHub (push + API)"
+            >
+              <FontAwesomeIcon icon={faCodePullRequest} className="mr-1" />
+              Pull Request {prOpen ? '▴' : '▾'}
+            </button>
+            {prOpen && (
+              <div className="mt-1.5 space-y-1.5">
+                <input
+                  value={prTitle}
+                  onChange={e => setPrTitle(e.target.value)}
+                  placeholder="Заголовок PR (пусто = LLM/коммит)"
+                  className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500"
+                />
+                <textarea
+                  value={prBody}
+                  onChange={e => setPrBody(e.target.value)}
+                  placeholder="Описание (пусто = LLM)"
+                  rows={2}
+                  className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500 resize-none"
+                />
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[10px] text-gray-500">base:</span>
+                  <input
+                    value={prBase}
+                    onChange={e => setPrBase(e.target.value)}
+                    className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-2 py-0.5 text-[11px] text-gray-200 code-font focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <label className="flex items-center text-[10px] text-gray-400 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={prLlm}
+                    onChange={e => setPrLlm(e.target.checked)}
+                    className="mr-1.5 accent-purple-500"
+                  />
+                  Сгенерировать заголовок/описание LLM
+                </label>
+                <button
+                  onClick={handlePr}
+                  disabled={busy !== null || (!prLlm && !prTitle.trim())}
+                  className="w-full text-[11px] py-1.5 rounded border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-300 transition-colors disabled:opacity-40"
+                >
+                  {busy === 'pr' ? 'Создание PR...' : 'Создать PR (push + GitHub)'}
+                </button>
+                {prResult && (
+                  <a
+                    href={prResult.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-[10px] text-purple-300 hover:text-purple-200 code-font truncate"
+                    title={prResult.url}
+                  >
+                    <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="mr-1" />
+                    PR #{prResult.number}: {prResult.branch} → {prResult.base}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Changed files */}

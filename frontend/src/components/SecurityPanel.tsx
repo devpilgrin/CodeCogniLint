@@ -34,6 +34,7 @@ interface Props {
   auditRunning: boolean;
   auditError: string | null;
   onAuditRun: (verify: boolean) => void;
+  onAuditExportHtml: () => void;
 }
 
 const sevBadge: Record<SecurityFinding['severity'], string> = {
@@ -69,7 +70,7 @@ const TOOL_NAMES: [string, string][] = [
 export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning, busyBaseline, error,
   onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding,
   pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan,
-  auditReport, auditRunning, auditError, onAuditRun }: Props) {
+  auditReport, auditRunning, auditError, onAuditRun, onAuditExportHtml }: Props) {
   const [verify, setVerify] = useState(true);
   const [view, setView] = useState<'code' | 'pentest' | 'audit'>('code');
 
@@ -116,6 +117,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
           error={auditError}
           onRun={onAuditRun}
           onOpenFile={(path) => onOpenFinding(path, 1)}
+          onExportHtml={onAuditExportHtml}
         />
       )}
 

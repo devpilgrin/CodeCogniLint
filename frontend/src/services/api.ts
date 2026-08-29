@@ -3,7 +3,7 @@ import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
   GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport,
+  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, PrResult,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -71,6 +71,8 @@ export const gitApi = {
     api.post<GitPullResult>('/git/pull', { token: token || null }).then(r => r.data),
   log: (limit = 10) =>
     api.get<{ commits: GitLogEntry[] }>('/git/log', { params: { limit } }).then(r => r.data.commits),
+  createPr: (title: string, body: string, base: string, withLlm: boolean) =>
+    api.post<PrResult>('/git/pr', { title, body, base, with_llm: withLlm }).then(r => r.data),
 };
 
 export const reviewApi = {
@@ -105,4 +107,6 @@ export const pentestApi = {
 export const auditApi = {
   run: (verify: boolean) =>
     api.post<AuditReport>('/audit/run', null, { params: { verify } }).then(r => r.data),
+  html: (report: AuditReport) =>
+    api.post('/audit/html', report, { responseType: 'blob' }).then(r => r.data as Blob),
 };

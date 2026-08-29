@@ -263,3 +263,85 @@ def generate_md(results: dict) -> str:
             out.append("")
 
     return "\n".join(out)
+
+
+# ---- HTML-экспорт отчёта аудита (волна: открытые направления) ----
+
+_AUDIT_RISK_LABEL = {
+    "low": ("Низкий", "#2ea043"),
+    "medium": ("Средний", "#d29922"),
+    "high": ("Высокий", "#f85149"),
+    "critical": ("Критический", "#da3633"),
+    "none": ("Чисто", "#2ea043"),
+}
+
+
+def _esc(v) -> str:
+    s = v if isinstance(v, str) else str(v)
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+             .replace('"', "&quot;"))
+
+
+def generate_audit_html(report: dict) -> str:
+    """Статичный HTML-отчёт аудита из готового JSON (детерминированный рендер)."""
+    syn = report.get("synthesis") or {}
+    risk = (syn or {}).get("risk_level") or ("none" if not report.get("total_findings") else "medium")
+    risk_label, risk_color = _AUDIT_RISK_LABEL.get(risk, _AUDIT_RISK_LABEL["medium"])
+    tools = ", ".join(k for k, v in (report.get("tools") or {}).items() if v) or "—"
+
+    def li(items):
+        return "\n".join(f"<li>{_esc(i)}</li>" for i in (items or [])) or "<li>—</li>"
+
+    matrix_rows = "\n".join(
+        f"<tr><td>{_esc(m['cwe'])}</td><td>{_esc(m['severity'])}</td>"
+        f"<td>{m['count']}</td><td>{_esc(m['exploitability'])}</td></tr>"
+        for m in (report.get("matrix") or [])
+    ) or "<tr><td colspan='4'>нет данных</td></tr>"
+
+    domains_html = []
+    for d in (report.get("domains") or []):
+        a = d.get("agent") or {}
+        _, dc = _AUDIT_RISK_LABEL.get(a.get("risk_level", "medium"), _AUDIT_RISK_LABEL["medium"])
+        fps = a.get("false_positives") or []
+        domains_html.append(f"""
+<section class="card">
+  <h3>{_esc(d.get('label', d.get('domain', '?')))}
+      <span class="badge" style="background:{dc}">{_esc(a.get('risk_level', '—'))}</span>
+      <small>{d.get('findings_count', 0)} находок</small></h3>
+  <p>{_esc(a.get('assessment', ''))}</p>
+  <h4>Эксплуатируемость</h4><ul>{li(a.get('exploitability'))}</ul>
+  <h4>Рекомендации</h4><ul>{li(a.get('recommendations'))}</ul>
+  {f"<h4>Ложные срабатывания</h4><ul>{li(fps)}</ul>" if fps else ""}
+</section>""")
+
+    return f"""<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Аудит безопасности — {_esc(report.get('workspace', ''))}</title>
+<style>
+body {{ font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0d1117; color: #c9d1d9;
+       max-width: 960px; margin: 24px auto; padding: 0 16px; }}
+h1 {{ font-size: 22px; }} h3 {{ margin-bottom: 6px; }} h4 {{ margin: 10px 0 4px; font-size: 13px; color: #8b949e; }}
+.card {{ background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 18px; margin: 12px 0; }}
+.badge {{ color: #fff; border-radius: 10px; padding: 2px 10px; font-size: 12px; vertical-align: middle; }}
+table {{ border-collapse: collapse; width: 100%; }} td, th {{ border: 1px solid #30363d; padding: 6px 10px; font-size: 13px; }}
+th {{ background: #21262d; text-align: left; }} small {{ color: #8b949e; font-weight: normal; }}
+ul {{ margin: 4px 0; padding-left: 20px; }} li {{ margin: 3px 0; font-size: 13px; }}
+.meta {{ color: #8b949e; font-size: 12px; }}
+</style></head><body>
+<h1>Отчёт аудита безопасности <span class="badge" style="background:{risk_color}">{risk_label}</span></h1>
+<p class="meta">Workspace: {_esc(report.get('workspace', ''))} · Сформирован: {_esc(report.get('scanned_at', ''))} ·
+Инструменты: {_esc(tools)} · Находок: {report.get('total_findings', 0)}
+(+{report.get('new_findings', 0)} новых / −{report.get('fixed_findings', 0)} исправлено)</p>
+
+{f'''<section class="card"><h3>Итоговый вердикт</h3><p>{_esc(syn.get('verdict', ''))}</p>
+<h4>Векторы атаки</h4><ul>{li(syn.get('attack_vectors'))}</ul>
+<h4>Приоритетные действия</h4><ul>{li(syn.get('top_actions'))}</ul></section>''' if syn else ""}
+
+<section class="card"><h3>Матрица рисков</h3>
+<table><tr><th>CWE</th><th>Тяжесть</th><th>Кол-во</th><th>Эксплуатируемость</th></tr>{matrix_rows}</table>
+</section>
+
+{''.join(domains_html) or '<section class="card"><p>Находок нет — аудит чистый.</p></section>'}
+<p class="meta">Сформировано CodeCogniLint · детерминированный рендер из JSON отчёта</p>
+</body></html>"""
+

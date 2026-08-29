@@ -1,8 +1,9 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 from services.workspace_service import get_workspace
-from services.git_service import GitError, status, diff, commit, push, pull, log
+from services.git_service import GitError, status, diff, commit, push, pull, log, create_pr, pr_context
+from services.llm_adapter import chat_completion, LLMError
 
 router = APIRouter(prefix="/git", tags=["git"])
 
@@ -76,5 +77,53 @@ def git_pull(body: PullRequest):
 def git_log(limit: int = Query(10, ge=1, le=50)):
     try:
         return log(_workspace_path(), limit)
+    except GitError as e:
+        raise _git_error(e)
+
+
+class PrRequest(BaseModel):
+    title: str = ""
+    body: str = ""
+    base: str = Field(default="main", min_length=1)
+    token: Optional[str] = None
+    with_llm: StrictBool = False  # сгенерировать title/body из diff через LLM
+
+
+_PR_SYSTEM = """Ты — помощник по оформлению Pull Request. По статистике diff и списку
+коммитов составь заголовок и описание PR. Ответь строго валидным JSON:
+{"title": "...", "body": "..."}. title — одна строка до 72 символов, body —
+2-4 пункта markdown (что сделано и зачем), без лишнего."""
+
+
+@router.post("/pr")
+async def git_create_pr(body: PrRequest):
+    """Создать GitHub PR: push ветки + API. with_llm — генерация title/body."""
+    ws_path = _workspace_path()
+    title, text = body.title.strip(), body.body.strip()
+    if body.with_llm:
+        try:
+            ctx = pr_context(ws_path, base=body.base)
+        except GitError as e:
+            raise _git_error(e)
+        user = (f"Ветка: {ctx['branch']} → {ctx['base']}\n\n"
+                f"Коммиты:\n" + "\n".join(f"- {c}" for c in ctx["commits"] or ["—"]) +
+                f"\n\nDiff --stat:\n{ctx['stat'] or '—'}")
+        try:
+            raw = await chat_completion([
+                {"role": "system", "content": _PR_SYSTEM},
+                {"role": "user", "content": user},
+            ])
+            import json as _json
+            start, end = raw.find("{"), raw.rfind("}")
+            if start != -1 and end > start:
+                data = _json.loads(raw[start:end + 1])
+                title = title or str(data.get("title", "")).strip()
+                text = text or str(data.get("body", "")).strip()
+        except (LLMError, ValueError):
+            if not title:
+                raise HTTPException(status_code=503,
+                                    detail="LLM недоступна — задайте заголовок PR вручную")
+    try:
+        return create_pr(ws_path, title=title, body=text, base=body.base, token=body.token)
     except GitError as e:
         raise _git_error(e)

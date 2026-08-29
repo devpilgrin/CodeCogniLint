@@ -140,6 +140,14 @@ export interface GitLogEntry {
   date: string;
 }
 
+export interface PrResult {
+  url: string;
+  number: number;
+  branch: string;
+  base: string;
+  created: boolean;  // false = PR уже существовал
+}
+
 export interface GitCommitResult {
   hash: string;
   message: string;

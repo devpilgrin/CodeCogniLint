@@ -247,3 +247,83 @@ def log(workspace: str, limit: int = 10) -> dict:
             "date": c.committed_datetime.isoformat(),
         })
     return {"commits": commits}
+
+
+# ---- PR/MR-интеграция ----
+
+_GITHUB_URL_RE = re.compile(
+    r"(?:https://github\.com/|git@github\.com:)(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$")
+
+
+def _github_slug(url: str) -> tuple[str, str]:
+    m = _GITHUB_URL_RE.search(url.strip())
+    if not m:
+        raise GitError(
+            "PR поддержан для remote github.com (https или ssh). "
+            f"Текущий remote: {_sanitize_url(url)}")
+    return m.group("owner"), m.group("repo")
+
+
+def create_pr(workspace: str, title: str, body: str = "", base: str = "main",
+              token: Optional[str] = None) -> dict:
+    """Создать Pull Request на GitHub: push текущей ветки + API GitHub.
+
+    Токен — из запроса / GIT_TOKEN / GITHUB_TOKEN (в конфиг не сохраняется)."""
+    title = (title or "").strip()
+    if not title:
+        raise GitError("Заголовок PR пустой")
+
+    repo = _repo(workspace)
+    push_result = push(workspace, token=token)
+
+    if "origin" not in [r.name for r in repo.remotes]:
+        raise GitError("У репозитория нет remote 'origin'")
+    owner, name = _github_slug(repo.remote("origin").url)
+    branch = push_result["branch"]
+    if branch == base:
+        raise GitError(f"Текущая ветка совпадает с base ({base}) — PR не из чего создать")
+
+    tk = _token(token)
+    if not tk:
+        raise GitError("Для создания PR нужен токен (GIT_TOKEN/GITHUB_TOKEN или параметр)")
+
+    import requests
+    api = f"https://api.github.com/repos/{owner}/{name}/pulls"
+    headers = {"Authorization": f"Bearer {tk}", "Accept": "application/vnd.github+json"}
+    payload = {"title": title, "head": branch, "base": base, "body": body}
+    try:
+        r = requests.post(api, json=payload, headers=headers, timeout=15)
+    except requests.RequestException as e:
+        raise GitError(f"GitHub API недоступен: {e}")
+
+    if r.status_code == 201:
+        pr = r.json()
+        return {"url": pr["html_url"], "number": pr["number"], "branch": branch,
+                "base": base, "created": True}
+    if r.status_code == 422:
+        # PR для этой ветки уже существует — возвращаем его
+        lst = requests.get(api, params={"head": f"{owner}:{branch}", "state": "open"},
+                           headers=headers, timeout=15)
+        if lst.ok and lst.json():
+            pr = lst.json()[0]
+            return {"url": pr["html_url"], "number": pr["number"], "branch": branch,
+                    "base": base, "created": False}
+        raise GitError(f"GitHub отклонил PR: {r.json().get('message', r.status_code)}")
+    raise GitError(f"GitHub API: {r.status_code} {r.json().get('message', '')[:200]}")
+
+
+def pr_context(workspace: str, base: str = "main") -> dict:
+    """Контекст для LLM-генерации описания PR: статистика diff + коммиты."""
+    repo = _repo(workspace)
+    try:
+        branch = repo.active_branch.name
+    except TypeError:
+        raise GitError("Detached HEAD")
+    try:
+        stat = repo.git.diff(f"{base}...HEAD", "--stat")
+    except git.GitCommandError:
+        stat = repo.git.diff("--stat", "HEAD~5..HEAD") if repo.head.is_valid() else ""
+    commits = [c.message.strip().splitlines()[0]
+               for c in repo.iter_commits(f"{base}..HEAD", max_count=20)] \
+        if repo.head.is_valid() else []
+    return {"branch": branch, "base": base, "stat": stat[:4000], "commits": commits}

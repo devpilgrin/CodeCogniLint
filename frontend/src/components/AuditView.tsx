@@ -12,6 +12,7 @@ interface Props {
   error: string | null;
   onRun: (verify: boolean) => void;
   onOpenFile: (path: string) => void;
+  onExportHtml: () => void;
 }
 
 const riskStyle: Record<string, string> = {
@@ -36,7 +37,7 @@ const explColor: Record<Exploitability, string> = {
 
 const sevLabel: Record<string, string> = { critical: 'CRIT', warning: 'WARN', info: 'INFO' };
 
-export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenFile }: Props) {
+export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenFile, onExportHtml }: Props) {
   const [verify, setVerify] = useState(false);
 
   if (!hasWorkspace) {
@@ -65,6 +66,15 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
           <input type="checkbox" checked={verify} onChange={e => setVerify(e.target.checked)} className="mr-1.5 accent-red-500" />
           Предварительная LLM-верификация находок
         </label>
+        {report && (
+          <button
+            onClick={onExportHtml}
+            className="w-full text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-blue-500/50 hover:text-blue-300 transition-colors"
+            title="Скачать отчёт аудита в HTML"
+          >
+            Экспорт отчёта (HTML)
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">

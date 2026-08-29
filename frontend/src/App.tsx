@@ -84,7 +84,7 @@ export default function App() {
     loadTools: loadPentestTools, runScan: runPentestScan,
   } = usePentest();
   const {
-    report: auditReport, running: auditRunning, error: auditError, run: runAudit,
+    report: auditReport, running: auditRunning, error: auditError, run: runAudit, exportHtml: exportAuditHtml,
   } = useAudit(workspace?.path ?? null);
 
   const activeTab = tabs[activeTabIndex] ?? null;
@@ -446,6 +446,7 @@ export default function App() {
           auditRunning={auditRunning}
           auditError={auditError}
           onAuditRun={runAudit}
+          onAuditExportHtml={exportAuditHtml}
         />
 
         <EditorPane

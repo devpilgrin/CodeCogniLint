@@ -49,6 +49,7 @@ interface Props {
   auditRunning: boolean;
   auditError: string | null;
   onAuditRun: (verify: boolean) => void;
+  onAuditExportHtml: () => void;
 }
 
 const categoryColor: Record<string, string> = {
@@ -275,6 +276,7 @@ export function Sidebar(props: Props) {
         auditRunning={props.auditRunning}
         auditError={props.auditError}
         onAuditRun={props.onAuditRun}
+        onAuditExportHtml={props.onAuditExportHtml}
       />
     );
   }
