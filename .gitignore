@@ -226,3 +226,4 @@ backend/projects/
 backend/.venv/
 backend.log
 frontend.log
+backend/.schemathesis/
