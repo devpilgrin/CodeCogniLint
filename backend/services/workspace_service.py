@@ -10,6 +10,10 @@ import git
 WORKSPACE_FILE = Path(__file__).parent.parent / ".hybrid-workspace.json"
 PROJECTS_DIR = Path(__file__).parent.parent / "projects"
 
+
+class NotFoundError(ValueError):
+    """Ресурс не найден (404): файл, путь, workspace."""
+
 SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
     "dist", "build", ".next", ".nuxt", "target", ".idea", ".vscode",
@@ -76,9 +80,14 @@ def get_workspace() -> dict:
 
 
 def set_workspace(path: str) -> dict:
-    p = Path(path).expanduser().resolve()
-    if not p.exists():
-        raise ValueError(f"Путь не существует: {p}")
+    try:
+        p = Path(path).expanduser().resolve()
+        exists = p.exists()
+    except ValueError:
+        # null-byte и прочие непригодные пути (фаззер) — трактуем как not found
+        raise NotFoundError(f"Некорректный путь: {path[:80]}")
+    if not exists:
+        raise NotFoundError(f"Путь не существует: {p}")
     if not p.is_dir():
         raise ValueError(f"Это не папка: {p}")
     state = _load_state()
@@ -136,7 +145,7 @@ def _is_binary(raw: bytes) -> bool:
 def build_tree(root: str) -> dict:
     root_path = Path(root).expanduser().resolve()
     if not root_path.is_dir():
-        raise ValueError("Workspace not found")
+        raise NotFoundError("Workspace not found")
 
     counter = [0]
     truncated = [False]
@@ -237,7 +246,7 @@ def read_file(workspace: str, rel_path: str) -> dict:
         raise ValueError("Файл за пределами проекта")
 
     if not target.is_file():
-        raise ValueError(f"Файл не найден: {rel_path}")
+        raise NotFoundError(f"Файл не найден: {rel_path}")
 
     size = target.stat().st_size
     if size > MAX_FILE_SIZE:
@@ -331,9 +340,13 @@ def browse_dir(path: Optional[str]) -> dict:
         home = str(Path.home())
         path = home
 
-    p = Path(path).expanduser().resolve()
-    if not p.exists():
-        raise ValueError(f"Путь не найден: {p}")
+    try:
+        p = Path(path).expanduser().resolve()
+        exists = p.exists()
+    except ValueError:
+        raise NotFoundError(f"Некорректный путь: {path[:80]}")
+    if not exists:
+        raise NotFoundError(f"Путь не найден: {p}")
     if not p.is_dir():
         raise ValueError(f"Это не папка: {p}")
 

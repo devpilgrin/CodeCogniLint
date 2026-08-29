@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.llm_adapter import settings, get_client
 
@@ -49,10 +49,14 @@ def update_settings(body: LLMSettings):
         settings.llm_api_key = body.apiKey
 
     # Persist to .env so settings survive restart
-    _write_env("LLM_PROVIDER", body.provider)
-    _write_env("LLM_BASE_URL", body.baseUrl)
-    _write_env("LLM_MODEL", body.model)
-    if body.apiKey:
-        _write_env("LLM_API_KEY", body.apiKey)
+    try:
+        _write_env("LLM_PROVIDER", body.provider)
+        _write_env("LLM_BASE_URL", body.baseUrl)
+        _write_env("LLM_MODEL", body.model)
+        if body.apiKey:
+            _write_env("LLM_API_KEY", body.apiKey)
+    except UnicodeError as e:
+        raise HTTPException(status_code=400,
+                            detail=f"Недопустимые символы в значении настройки: {e}")
 
     return get_settings()

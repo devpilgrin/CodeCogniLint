@@ -33,7 +33,9 @@ async def security_scan(verify: bool = Query(False, description="LLM-вериф�
     return await scan_workspace(_workspace_path(), verify=verify)
 
 
-@router.post("/sarif")
+@router.post("/sarif", responses={
+    200: {"content": {"application/sarif+json": {}}, "description": "SARIF 2.1.0 отчёт"},
+})
 async def security_sarif():
     """SARIF 2.1.0-экспорт свежего скана (GitHub Code Scanning / CI)."""
     ws_path = _workspace_path()

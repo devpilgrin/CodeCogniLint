@@ -293,6 +293,7 @@ CodeCogniLint/
 - Suppression `# ccl:ignore`, baseline/diff находок, метрики покрытия, SARIF-экспорт
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
 - Мульти-агентный аудит: суб-агенты по доменам + синтезатор + матрица рисков (CWE)
+- API-гигиена: security-заголовки, документированные коды/типы ответов, устойчивость к фаззингу (собственный пентест: 35 → 0 дефектов корректности)
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

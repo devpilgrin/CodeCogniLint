@@ -10,7 +10,10 @@ class ReportRequest(BaseModel):
     results: dict
 
 
-@router.post("/xlsx")
+@router.post("/xlsx", responses={
+    200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}},
+          "description": "XLSX-файл отчёта"},
+})
 def report_xlsx(body: ReportRequest):
     data = generate_xlsx(body.results)
     return Response(
@@ -20,7 +23,9 @@ def report_xlsx(body: ReportRequest):
     )
 
 
-@router.post("/md")
+@router.post("/md", responses={
+    200: {"content": {"text/markdown": {}}, "description": "Markdown-отчёт"},
+})
 def report_md(body: ReportRequest):
     md = generate_md(body.results)
     return Response(

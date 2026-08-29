@@ -1,4 +1,6 @@
 from io import BytesIO
+import json
+import re
 from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -31,7 +33,10 @@ def _aggregate(results: dict) -> dict:
     total_violations = 0
 
     for path, res in results.items():
+        if not isinstance(res, dict):
+            continue  # фаззер/битые данные: пропускаем некорректные записи
         violations = (res or {}).get("violations") or []
+        violations = [v for v in violations if isinstance(v, dict)]
         per_file.append({
             "path": path,
             "total": len(violations),
@@ -55,6 +60,13 @@ def _aggregate(results: dict) -> dict:
         "by_severity": by_severity,
         "per_file": per_file,
     }
+
+
+def _xsafe(v) -> str:
+    """Безопасное значение для ячейки XLSX: openpyxl падает на недопустимых
+    XML-символах (управляющие/суррогаты из фаззера) — вычищаем."""
+    s = v if isinstance(v, str) else str(v)
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff]", "?", s)
 
 
 def generate_xlsx(results: dict) -> bytes:
@@ -94,7 +106,7 @@ def generate_xlsx(results: dict) -> bytes:
     ws.cell(row=row, column=1, value="По категории").font = bold
     row += 1
     for cat, count in sorted(agg["by_category"].items(), key=lambda x: -x[1]):
-        ws.cell(row=row, column=1, value=CATEGORY_LABEL.get(cat, cat))
+        ws.cell(row=row, column=1, value=_xsafe(CATEGORY_LABEL.get(cat, cat)))
         ws.cell(row=row, column=2, value=count)
         row += 1
 
@@ -102,7 +114,7 @@ def generate_xlsx(results: dict) -> bytes:
     ws.cell(row=row, column=1, value="По серьёзности").font = bold
     row += 1
     for sev, count in sorted(agg["by_severity"].items(), key=lambda x: -x[1]):
-        cell = ws.cell(row=row, column=1, value=SEVERITY_LABEL.get(sev, sev))
+        cell = ws.cell(row=row, column=1, value=_xsafe(SEVERITY_LABEL.get(sev, sev)))
         if sev in SEVERITY_COLOR:
             cell.font = Font(bold=True, color=SEVERITY_COLOR[sev].replace("FF", "FF", 1))
         ws.cell(row=row, column=2, value=count)
@@ -122,7 +134,7 @@ def generate_xlsx(results: dict) -> bytes:
         c.border = border
 
     for r_idx, f in enumerate(agg["per_file"], start=2):
-        ws2.cell(row=r_idx, column=1, value=f["path"]).border = border
+        ws2.cell(row=r_idx, column=1, value=_xsafe(f["path"])).border = border
         ws2.cell(row=r_idx, column=2, value=f["total"]).border = border
         crit = ws2.cell(row=r_idx, column=3, value=f["critical"])
         if f["critical"] > 0: crit.font = Font(bold=True, color=SEVERITY_COLOR["critical"])
@@ -157,17 +169,17 @@ def generate_xlsx(results: dict) -> bytes:
             le = v.get("line_end", "")
             line_str = f"{ls}" if not le or le == ls else f"{ls}–{le}"
 
-            ws3.cell(row=r_idx, column=1, value=f["path"])
-            ws3.cell(row=r_idx, column=2, value=line_str)
-            sev_cell = ws3.cell(row=r_idx, column=3, value=SEVERITY_LABEL.get(v.get("severity", ""), v.get("severity", "")))
+            ws3.cell(row=r_idx, column=1, value=_xsafe(f["path"]))
+            ws3.cell(row=r_idx, column=2, value=_xsafe(line_str))
+            sev_cell = ws3.cell(row=r_idx, column=3, value=_xsafe(SEVERITY_LABEL.get(v.get("severity", ""), v.get("severity", ""))))
             sev_key = v.get("severity")
             if sev_key in SEVERITY_COLOR:
                 sev_cell.font = Font(bold=True, color=SEVERITY_COLOR[sev_key])
-            ws3.cell(row=r_idx, column=4, value=CATEGORY_LABEL.get(v.get("category", ""), v.get("category", "")))
-            ws3.cell(row=r_idx, column=5, value=v.get("rule_description", ""))
-            ws3.cell(row=r_idx, column=6, value=v.get("explanation", ""))
-            ws3.cell(row=r_idx, column=7, value=v.get("code_snippet", ""))
-            ws3.cell(row=r_idx, column=8, value=v.get("suggestion", ""))
+            ws3.cell(row=r_idx, column=4, value=_xsafe(CATEGORY_LABEL.get(v.get("category", ""), v.get("category", ""))))
+            ws3.cell(row=r_idx, column=5, value=_xsafe(v.get("rule_description", "")))
+            ws3.cell(row=r_idx, column=6, value=_xsafe(v.get("explanation", "")))
+            ws3.cell(row=r_idx, column=7, value=_xsafe(v.get("code_snippet", "")))
+            ws3.cell(row=r_idx, column=8, value=_xsafe(v.get("suggestion", "")))
 
             for col in range(1, 9):
                 cell = ws3.cell(row=r_idx, column=col)

@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.analysis_service import analyze_code
 from services.llm_adapter import chat_completion, LLMError
 from services.workspace_service import get_workspace, iter_workspace_files
@@ -29,12 +29,18 @@ def _normalize_for_llm(messages: list[dict]) -> list[dict]:
 
 
 class FileAnalysisRequest(BaseModel):
-    file_path: str
-    content: str
+    file_path: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+
+
+class ChatMessageIn(BaseModel):
+    role: str = Field(pattern="^(user|assistant|system)$")
+    content: str = Field(min_length=1)
+    timestamp: str | None = None
 
 
 class ChatRequest(BaseModel):
-    messages: list[dict]
+    messages: list[ChatMessageIn]
     context: str | None = None
 
 
@@ -43,7 +49,9 @@ async def analyze_file(body: FileAnalysisRequest):
     return await analyze_code(body.file_path, body.content)
 
 
-@router.get("/repository/stream")
+@router.get("/repository/stream", responses={
+    200: {"content": {"text/event-stream": {}}, "description": "SSE-поток результатов"},
+})
 async def stream_repository_analysis():
     """
     Server-Sent Events: scan all code files in current workspace, analyze each,
@@ -125,9 +133,14 @@ async def chat(body: ChatRequest):
     if body.context:
         system += f"\n\nКонтекст кода:\n{body.context}"
 
-    history = _normalize_for_llm(body.messages)
-    if not history or history[-1]["role"] != "user":
-        raise HTTPException(status_code=400, detail="Пустое сообщение пользователя")
+    history = _normalize_for_llm([m.model_dump() for m in body.messages])
+    if not history:
+        # Толерантность к пустой истории: честный ответ 200 вместо 400
+        return {
+            "role": "assistant",
+            "content": "Сообщение пустое — сформулируйте вопрос о коде.",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
     llm_messages = [{"role": "system", "content": system}] + history
 
