@@ -214,6 +214,9 @@ CodeCogniLint/
 │   │   └── settings.py               # LLM-настройки + запись в .env
 │   ├── security/
 │   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
+│   ├── quality/
+│   │   └── quality-rules.yml         # производительность + best practices (офлайн)
+│   ├── tests/                        # pytest: unit (сервисы) + smoke (API)
 │   └── services/
 │       ├── llm_adapter.py            # LLMError + friendly error mapping
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
@@ -305,6 +308,7 @@ CodeCogniLint/
 - HTML-экспорт отчёта аудита (детерминированный рендер)
 - Настройки LLM: валидация до записи + атомарная перезапись .env
 - **Качество кода** — отдельный слой: semgrep-паттерны производительности и best practices (python/js/ts), метрики размера (LOC, длина функций, цикломатическая сложность через radon), рейтинг hotspot'ов, опциональный LLM-разбор топ-hotspot'ов
+- **Тестовый контур** — pytest: unit-тесты сервисов (suppression/baseline/fingerprint, санитайзеры отчётов, валидация настроек, метрики качества) + smoke-эндпоинтов через TestClient; прогон в CI
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

@@ -36,6 +36,12 @@ jobs:
         working-directory: backend
         run: python -c "from main import app; print('FastAPI app import OK:', app.title)"
 
+      - name: Install dev deps & run tests
+        working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest tests/ -q
+
   frontend:
     name: Frontend (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
