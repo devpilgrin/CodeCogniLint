@@ -1,0 +1,13 @@
+# Модели для бенчмарка верификации. Ключи — только через env.
+# base_url: OpenAI-совместимый /v1-эндпоинт; api_key_env: имя переменной окружения.
+models:
+  - name: kimi-k3
+    base_url: https://api.kimi.com/coding/v1
+    model: k3
+    api_key_env: KIMI_API_KEY
+    temperature: 1.0      # k3 принимает только temperature=1
+  - name: lmstudio-local
+    base_url: http://localhost:1234/v1
+    model: local-model
+    api_key_env: null     # LM Studio без ключа
+    temperature: 0.3

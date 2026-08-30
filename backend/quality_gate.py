@@ -1,5 +1,5 @@
 """CLI гейта качества для CI:
-
+# ccl:ignore-file bp-print-in-code
     python backend/quality_gate.py [path]
 
 Читает .ccl-quality.yml в корне проекта (пороги + ratchet-бюджеты),

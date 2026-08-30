@@ -1,0 +1,178 @@
+[
+  {
+    "id": "tp-sqli-fstring",
+    "rule": "py-sqli-fstring",
+    "cwe": "CWE-89",
+    "claim": "f-строка в SQL-запросе с пользовательским вводом — SQL-инъекция",
+    "file": "auth.py", "line": 12,
+    "snippet": "cursor.execute(f\"SELECT * FROM users WHERE name = '{username}'\")",
+    "context": "def login(username, password):\n    cursor = db.cursor()\n    cursor.execute(f\"SELECT * FROM users WHERE name = '{username}'\")\n    return cursor.fetchone()",
+    "expected": "confirmed",
+    "note": "классическая SQLi через f-строку"
+  },
+  {
+    "id": "tp-os-system-input",
+    "rule": "py-os-system",
+    "cwe": "CWE-78",
+    "claim": "os.system с аргументом из HTTP-запроса — инъекция команд",
+    "file": "tools.py", "line": 5,
+    "snippet": "os.system('ping -c1 ' + request.args['host'])",
+    "context": "from flask import request\nimport os\ndef ping():\n    os.system('ping -c1 ' + request.args['host'])",
+    "expected": "confirmed",
+    "note": "ввод пользователя напрямую в shell"
+  },
+  {
+    "id": "tp-eval-request",
+    "rule": "py-eval",
+    "cwe": "CWE-95",
+    "claim": "eval на данных из запроса — выполнение произвольного кода",
+    "file": "calc.py", "line": 3,
+    "snippet": "result = eval(request.form['expr'])",
+    "context": "from flask import request\ndef calc():\n    result = eval(request.form['expr'])\n    return str(result)",
+    "expected": "confirmed",
+    "note": "eval пользовательского ввода"
+  },
+  {
+    "id": "tp-pickle-network",
+    "rule": "py-pickle-loads",
+    "cwe": "CWE-502",
+    "claim": "pickle.loads на сетевых данных — десериализация → RCE",
+    "file": "sync.py", "line": 8,
+    "snippet": "obj = pickle.loads(resp.content)",
+    "context": "import pickle, requests\ndef fetch_state(url):\n    resp = requests.get(url)\n    obj = pickle.loads(resp.content)\n    return obj",
+    "expected": "confirmed",
+    "note": "pickle из сети"
+  },
+  {
+    "id": "tp-aws-key",
+    "rule": "secret-aws-key",
+    "cwe": "CWE-798",
+    "claim": "AWS Access Key ID в коде — утечка креденшелов",
+    "file": "s3upload.py", "line": 4,
+    "snippet": "AWS_KEY = 'AKIAIOSFODNN7EXAMPLE'",
+    "context": "import boto3\nAWS_KEY = 'AKIAIOSFODNN7EXAMPLE'\nAWS_SECRET = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'\nclient = boto3.client('s3', aws_access_key_id=AWS_KEY, aws_secret_access_key=AWS_SECRET)",
+    "expected": "false_positive",
+    "note": "ЛОВУШКА: официальный пример из документации AWS — модель обязана распознать плейсхолдер, а не подтвердить по формату AKIA"
+  },
+  {
+    "id": "tp-md5-password",
+    "rule": "py-weak-hash",
+    "cwe": "CWE-327",
+    "claim": "md5 для хеширования паролей — слабый алгоритм",
+    "file": "users.py", "line": 9,
+    "snippet": "pwd_hash = hashlib.md5(password.encode()).hexdigest()",
+    "context": "import hashlib\ndef register(password):\n    pwd_hash = hashlib.md5(password.encode()).hexdigest()\n    save_user(pwd_hash)",
+    "expected": "confirmed",
+    "note": "md5 в security-контексте (пароль)"
+  },
+  {
+    "id": "tp-verify-false-prod",
+    "rule": "py-requests-verify-false",
+    "cwe": "CWE-295",
+    "claim": "verify=False к боевому API — TLS-проверка отключена, MITM",
+    "file": "billing.py", "line": 6,
+    "snippet": "requests.post('https://api.billing.example.com/charge', json=data, verify=False)",
+    "context": "import requests\ndef charge(data):\n    return requests.post('https://api.billing.example.com/charge', json=data, verify=False)",
+    "expected": "confirmed",
+    "note": "verify=False на проде"
+  },
+  {
+    "id": "tp-shell-true-format",
+    "rule": "py-shell-true",
+    "cwe": "CWE-78",
+    "claim": "subprocess shell=True с форматированной строкой — инъекция команд",
+    "file": "backup.py", "line": 7,
+    "snippet": "subprocess.run(f'tar czf /backup/{name}.tgz ./data', shell=True)",
+    "context": "import subprocess\ndef backup(name):\n    subprocess.run(f'tar czf /backup/{name}.tgz ./data', shell=True)",
+    "expected": "confirmed",
+    "note": "shell=True + переменная"
+  },
+  {
+    "id": "fp-parametrized-query",
+    "rule": "py-sqli-fstring",
+    "cwe": "CWE-89",
+    "claim": "f-строка в SQL-запросе с пользовательским вводом — SQL-инъекция",
+    "file": "auth.py", "line": 12,
+    "snippet": "cursor.execute('SELECT * FROM users WHERE name = %s', (username,))",
+    "context": "def login(username, password):\n    cursor = db.cursor()\n    cursor.execute('SELECT * FROM users WHERE name = %s', (username,))\n    return cursor.fetchone()",
+    "expected": "false_positive",
+    "note": "параметризованный запрос — безопасно (regex-поиск сработал на 'execute')"
+  },
+  {
+    "id": "fp-os-system-constant",
+    "rule": "py-os-system",
+    "cwe": "CWE-78",
+    "claim": "os.system с аргументом из HTTP-запроса — инъекция команд",
+    "file": "maintenance.py", "line": 4,
+    "snippet": "os.system('systemctl restart app-worker')",
+    "context": "import os\ndef restart_worker():\n    os.system('systemctl restart app-worker')",
+    "expected": "false_positive",
+    "note": "константная команда без ввода"
+  },
+  {
+    "id": "fp-md5-checksum",
+    "rule": "py-weak-hash",
+    "cwe": "CWE-327",
+    "claim": "md5 для хеширования паролей — слабый алгоритм",
+    "file": "dedup.py", "line": 6,
+    "snippet": "file_id = hashlib.md5(chunk).hexdigest()",
+    "context": "import hashlib\ndef chunk_id(chunk):\n    file_id = hashlib.md5(chunk).hexdigest()\n    return file_id",
+    "expected": "false_positive",
+    "note": "md5 для дедупликации чанков — не security-контекст"
+  },
+  {
+    "id": "fp-verify-false-local",
+    "rule": "py-requests-verify-false",
+    "cwe": "CWE-295",
+    "claim": "verify=False к боевому API — TLS-проверка отключена, MITM",
+    "file": "dev_probe.py", "line": 5,
+    "snippet": "requests.get('https://localhost:8443/health', verify=False)",
+    "context": "import requests\ndef probe_local():\n    return requests.get('https://localhost:8443/health', verify=False)",
+    "expected": "false_positive",
+    "note": "localhost self-signed в dev-утилите"
+  },
+  {
+    "id": "fp-placeholder-key",
+    "rule": "secret-api-key",
+    "cwe": "CWE-798",
+    "claim": "API-ключ в коде — утечка креденшелов",
+    "file": "example.py", "line": 3,
+    "snippet": "API_KEY = 'sk-your-api-key-here'",
+    "context": "# Пример конфигурации\nAPI_KEY = 'sk-your-api-key-here'\nBASE_URL = 'https://api.example.com'",
+    "expected": "false_positive",
+    "note": "очевидный плейсхолдер"
+  },
+  {
+    "id": "fp-eval-literal",
+    "rule": "py-eval",
+    "cwe": "CWE-95",
+    "claim": "eval на данных из запроса — выполнение произвольного кода",
+    "file": "settings_parse.py", "line": 4,
+    "snippet": "LIMITS = eval('{\"cpu\": 4, \"mem\": 8}')",
+    "context": "# статичная конфигурация (literal)\nLIMITS = eval('{\"cpu\": 4, \"mem\": 8}')",
+    "expected": "false_positive",
+    "note": "eval константного литерала (спорно, но не RCE)"
+  },
+  {
+    "id": "fp-empty-password",
+    "rule": "py-hardcoded-password",
+    "cwe": "CWE-798",
+    "claim": "Пароль/секрет зашит в коде",
+    "file": "config.py", "line": 6,
+    "snippet": "DB_PASSWORD = os.environ.get('DB_PASSWORD', '')",
+    "context": "import os\nDB_PASSWORD = os.environ.get('DB_PASSWORD', '')\nDB_HOST = os.environ.get('DB_HOST', 'localhost')",
+    "expected": "false_positive",
+    "note": "секрет из env, пустой дефолт"
+  },
+  {
+    "id": "fp-shell-true-constant",
+    "rule": "py-shell-true",
+    "cwe": "CWE-78",
+    "claim": "subprocess shell=True с форматированной строкой — инъекция команд",
+    "file": "cleanup.py", "line": 5,
+    "snippet": "subprocess.run('find /tmp -mtime +7 -delete', shell=True)",
+    "context": "import subprocess\ndef cleanup_tmp():\n    subprocess.run('find /tmp -mtime +7 -delete', shell=True)",
+    "expected": "false_positive",
+    "note": "константная команда (риск только в shell=True как практике)"
+  }
+]

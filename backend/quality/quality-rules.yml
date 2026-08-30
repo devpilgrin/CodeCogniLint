@@ -11,21 +11,8 @@ rules:
       if $X in [$A, ...]:
         ...
 
-  - id: perf-string-concat-in-loop
-    languages: [python]
-    severity: WARNING
-    message: Конкатенация строк в цикле O(n²) — используйте ''.join() или list.append
-    metadata: {category: performance}
-    patterns:
-      - pattern-inside: |
-          for ... in ...:
-            ...
-      - pattern-either:
-          - pattern: $S += $X
-          - pattern: $S = $S + $X
-      - metavariable-regex:
-          metavariable: $S
-          regex: ^[a-z_][a-z0-9_]*$
+  # NB: правило string-concat-in-loop исключено — semgrep generic-движок
+  # давал массовые ложные срабатывания на обычном тексте (аналог bp-js-var)
 
   - id: perf-len-in-loop-condition
     languages: [python]

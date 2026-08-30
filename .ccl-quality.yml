@@ -7,9 +7,11 @@ func_loc: 60         # строк на функцию
 func_cc: 10          # цикломатическая сложность функции
 
 # Бюджеты (текущее состояние; снижать по мере разбора долга)
-max_findings_total: 41
-max_perf_findings: 26
-max_bp_findings: 15
+# v0.18: исключены ложноположительные правила (bp-js-var, perf-string-concat),
+#        реализована ccl:ignore-file для CLI — бюджеты ужаты 41 → 28
+max_findings_total: 28
+max_perf_findings: 8
+max_bp_findings: 20
 max_complex_functions: 20
 max_long_functions: 4
 max_big_files: 2

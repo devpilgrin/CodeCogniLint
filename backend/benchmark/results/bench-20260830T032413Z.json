@@ -1,0 +1,26 @@
+{
+  "timestamp": "20260830T032413Z",
+  "cases": 16,
+  "results": [
+    {
+      "model": "kimi-k3",
+      "available": true,
+      "latency_s": 22.9,
+      "parse_error": null,
+      "tp": 7,
+      "tn": 9,
+      "fp": 0,
+      "fn": 0,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "unparsed": 0,
+      "errors": []
+    },
+    {
+      "model": "lmstudio-local",
+      "available": false
+    }
+  ]
+}

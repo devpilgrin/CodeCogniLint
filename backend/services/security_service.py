@@ -48,6 +48,7 @@ SECRET_PATTERNS: list[tuple[str, str, str]] = [
 # Suppression: строка с "# ccl:ignore" (опц. с rule_id или CWE) на строке находки
 # или строкой выше. Пример: password = "x"  # ccl:ignore py-hardcoded-password
 SUPPRESSION_RE = re.compile(r"ccl:ignore(?:[:\s]+([\w\-\./]+))?", re.IGNORECASE)
+FILE_SUPPRESSION_RE = re.compile(r"ccl:ignore-file(?:[:\s]+([\w\-\./]+))?", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------- инструменты
@@ -476,8 +477,29 @@ def _apply_suppression(workspace: str, findings: list[dict]) -> list[dict]:
                 cache[rel] = []
         return cache[rel]
 
+    # Файловая suppression: ccl:ignore-file [rule] в первых 5 строках файла —
+    # глушит все находки файла (или только указанного правила)
+    file_rules: dict[str, Optional[str]] = {}
+
+    def file_suppression(rel: str) -> Optional[str]:
+        if rel not in file_rules:
+            lines = file_lines(rel)
+            rule: Optional[str] = ""
+            for line in lines[:5]:
+                m = FILE_SUPPRESSION_RE.search(line)
+                if m:
+                    rule = m.group(1) or None
+                    break
+            file_rules[rel] = rule
+        return file_rules[rel]
+
     for f in findings:
         f.setdefault("suppressed", False)
+        flt_file = file_suppression(f["path"])
+        # "": файловой suppression нет; None: глушить всё; "rule": только это правило
+        if flt_file != "" and (flt_file is None or flt_file in (f["rule_id"], f.get("cwe") or "")):
+            f["suppressed"] = True
+            continue
         lines = file_lines(f["path"])
         if not lines:
             continue

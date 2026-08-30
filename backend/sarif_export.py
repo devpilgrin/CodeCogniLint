@@ -1,5 +1,5 @@
 """CLI экспорта SARIF для CI (GitHub Code Scanning):
-
+# ccl:ignore-file bp-print-in-code
     python backend/sarif_export.py <workspace> [out.sarif]
 
 Гоняет детерминированные слои security-скана (semgrep/secrets/SCA, без LLM)

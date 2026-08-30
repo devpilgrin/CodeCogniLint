@@ -324,6 +324,7 @@ CodeCogniLint/
 - **Производительность сканов** — параллельный запуск независимых слоёв (semgrep/secrets/SCA, quality rules+metrics); SCA-кэш по хешу манифестов (повторный скан без изменений ~40x быстрее); манифесты ищутся рекурсивно (backend/requirements.txt, frontend/package-lock.json)
 - **Docker-дистрибуция** — multi-stage образ: frontend собирается и раздаётся FastAPI как статика; один контейнер = UI + API; CONTRIBUTING.md для участников
 - **Watch-режим** — авто-перескан при изменении файлов: SSE-поток `/api/watch/stream` (polling mtime, debounce, детерминированные слои без LLM), переключатель в панели Безопасность
+- **Бенчмарк LLM** — `backend/benchmark/`: эталонный набор верификации (16 кейсов TP/FP с ловушками), прогон боевого промпта по моделям из `models.yml`, метрики accuracy/precision/recall/F1 + латентность; результаты в `benchmark/results/`
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

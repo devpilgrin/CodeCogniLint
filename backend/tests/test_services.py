@@ -36,6 +36,26 @@ def test_suppression_rule_mismatch_not_suppressed(tmp_path):
     assert not out[0].get("suppressed")
 
 
+def test_suppression_file_level(tmp_path):
+    src = tmp_path / "cli.py"
+    src.write_text('"""CLI.\n# ccl:ignore-file bp-print-in-code\n"""\nprint(1)\nprint(2)\n',
+                   encoding="utf-8")
+    findings = [{"path": "cli.py", "line_start": 4, "rule_id": "bp-print-in-code"},
+                {"path": "cli.py", "line_start": 5, "rule_id": "bp-print-in-code"},
+                {"path": "cli.py", "line_start": 5, "rule_id": "other-rule"}]
+    out = sec._apply_suppression(str(tmp_path), findings)
+    assert out[0]["suppressed"] and out[1]["suppressed"]
+    assert not out[2].get("suppressed")  # другое правило не глушится
+
+
+def test_suppression_file_level_all_rules(tmp_path):
+    src = tmp_path / "gen.py"
+    src.write_text("# ccl:ignore-file\nx = 1\n", encoding="utf-8")
+    findings = [{"path": "gen.py", "line_start": 2, "rule_id": "any-rule"}]
+    out = sec._apply_suppression(str(tmp_path), findings)
+    assert out[0]["suppressed"]
+
+
 # ------------------------------------------------------------------ fingerprint/baseline
 
 def test_fingerprint_stable_and_line_independent():
@@ -216,6 +236,31 @@ def test_sarif_structure():
 
 
 # ------------------------------------------------------------------ гейт качества
+
+def test_benchmark_scoring():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "run_benchmark", "benchmark/run_benchmark.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    cases = [{"id": "a", "expected": "confirmed"}, {"id": "b", "expected": "confirmed"},
+             {"id": "c", "expected": "false_positive"}, {"id": "d", "expected": "false_positive"}]
+    # идеальный прогон
+    s = mod.score(cases, {"a": "confirmed", "b": "confirmed",
+                          "c": "false_positive", "d": "false_positive"})
+    assert s["accuracy"] == 1.0 and s["precision"] == 1.0 and s["recall"] == 1.0
+    # один FN (ложное отрицание)
+    s = mod.score(cases, {"a": "confirmed", "b": "false_positive",
+                          "c": "false_positive", "d": "false_positive"})
+    assert s["tp"] == 1 and s["fn"] == 1 and s["recall"] == 0.5 and s["precision"] == 1.0
+    # один FP (ложное подтверждение)
+    s = mod.score(cases, {"a": "confirmed", "b": "confirmed",
+                          "c": "confirmed", "d": "false_positive"})
+    assert s["fp"] == 1 and s["precision"] == round(2 / 3, 3)
+    # нераспознанный ответ — считается ошибкой
+    s = mod.score(cases, {"a": "confirmed", "b": "confirmed", "c": "false_positive"})
+    assert s["unparsed"] == 1 and s["fp"] == 1
 
 def test_remote_parsing():
     from services.git_service import _parse_remote, GitError
