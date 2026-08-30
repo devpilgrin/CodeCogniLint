@@ -4,6 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/devpilgrin/CodeCogniLint)](https://github.com/devpilgrin/CodeCogniLint/releases)
 [![License](https://img.shields.io/github/license/devpilgrin/CodeCogniLint)](LICENSE)
 
+**Языки:** **Русский** | [English](README.en.md)
+
 Гибридная система анализа кода для веба: статистика Git-истории + семантическое понимание LLM. IDE-подобный интерфейс с редактором Monaco, динамическими правилами и поддержкой как облачных, так и локальных моделей.
 
 ![Скриншот интерфейса CodeCogniLint](image/scren.png)
@@ -31,6 +33,7 @@
 - **Динамические правила** — создание из выделенного кода через LLM или вручную через форму; включение/отключение, редактирование, удаление
 - **Чат с LLM** — отдельная вкладка, контекст активного файла подмешивается автоматически; нормализация истории для строгих jinja-шаблонов
 - **Multi-LLM** — LM Studio (локально), OpenAI, Anthropic; настройки сохраняются в `.env`
+- **Локализация интерфейса** — русский, английский, китайский, испанский (переключатель в Настройках); словари `frontend/src/i18n/locales/`
 
 
 ## Стек
@@ -283,6 +286,9 @@ CodeCogniLint/
 │   ├── vite.config.ts                # прокси /api → :8000
 │   └── src/
 │       ├── App.tsx                   # композиция, табы, jump-to-line, диалоги
+│       ├── i18n/                     # локализация UI (ru/en/zh/es): провайдер + словари
+│       │   ├── index.tsx             # I18nProvider, useI18n, t() с интерполяцией
+│       │   └── locales/              # ru.ts / en.ts / zh.ts / es.ts
 │       ├── components/
 │       │   ├── Header.tsx
 │       │   ├── ActivityBar.tsx

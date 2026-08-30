@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import type { Rule, RuleCategory } from '../types';
 import { rulesApi } from '../services/api';
+import { useI18n } from '../i18n';
 
-function errMsg(err: unknown, fallback: string): string {
+function errMsg(err: unknown, fallback: string, offline: string): string {
   if (axios.isAxiosError(err)) {
     if (err.response?.data?.detail) return String(err.response.data.detail);
-    if (err.code === 'ERR_NETWORK') return 'Бэкенд недоступен. Запустите start-backend.bat.';
+    if (err.code === 'ERR_NETWORK') return offline;
   }
   return fallback;
 }
@@ -19,6 +20,7 @@ export interface ManualRuleInput {
 }
 
 export function useRules() {
+  const { t } = useI18n();
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function useRules() {
       setRules(prev => [...prev, rule]);
       return true;
     } catch (err) {
-      setLastError(errMsg(err, 'Ошибка генерации правила'));
+      setLastError(errMsg(err, t('err.generateRule'), t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -62,7 +64,7 @@ export function useRules() {
       setRules(prev => [...prev, rule]);
       return true;
     } catch (err) {
-      setLastError(errMsg(err, 'Не удалось создать правило'));
+      setLastError(errMsg(err, t('err.createRule'), t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -78,7 +80,7 @@ export function useRules() {
     } catch (err) {
       // Roll back
       setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !enabled } : r));
-      setLastError(errMsg(err, 'Не удалось изменить состояние правила'));
+      setLastError(errMsg(err, t('err.toggleRule'), t('err.backendOfflineDetail')));
     }
   }, []);
 
@@ -88,7 +90,7 @@ export function useRules() {
       setRules(prev => prev.map(r => r.id === id ? updated : r));
       return true;
     } catch (err) {
-      setLastError(errMsg(err, 'Не удалось обновить правило'));
+      setLastError(errMsg(err, t('err.updateRule'), t('err.backendOfflineDetail')));
       return false;
     }
   }, []);

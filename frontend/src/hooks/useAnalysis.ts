@@ -1,26 +1,28 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { AnalysisResult, ChatMessage } from '../types';
 import { analysisApi } from '../services/api';
+import { useI18n } from '../i18n';
 
-const STEPS = [
-  'Сканирование Git коммитов...',
-  'Извлечение контекста LLM...',
-  'Поиск логических конфликтов...',
-  'Генерация рекомендаций...',
+const STEP_KEYS = [
+  'analysis.step1',
+  'analysis.step2',
+  'analysis.step3',
+  'analysis.step4',
 ];
 
 export function useAnalysis() {
+  const { t } = useI18n();
   const [resultsByFile, setResultsByFile] = useState<Record<string, AnalysisResult>>({});
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'system',
-      content: 'Готов к анализу. Выделите код и создайте правило, или нажмите кнопку анализа.',
+      content: t('analysis.welcome'),
       timestamp: new Date().toISOString(),
     },
   ]);
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [stepLabel, setStepLabel] = useState(STEPS[0]);
+  const [stepLabel, setStepLabel] = useState(t(STEP_KEYS[0]));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -47,26 +49,26 @@ export function useAnalysis() {
     closeStream();
     setAnalyzing(true);
     setProgress(0);
-    setStepLabel(STEPS[0]);
+    setStepLabel(t(STEP_KEYS[0]));
 
     let currentProgress = 0;
     intervalRef.current = setInterval(() => {
       currentProgress = Math.min(currentProgress + Math.random() * 18 + 2, 90);
-      const idx = Math.min(Math.floor((currentProgress / 90) * STEPS.length), STEPS.length - 1);
+      const idx = Math.min(Math.floor((currentProgress / 90) * STEP_KEYS.length), STEP_KEYS.length - 1);
       setProgress(currentProgress);
-      setStepLabel(STEPS[idx]);
+      setStepLabel(t(STEP_KEYS[idx]));
     }, 350);
 
     try {
       const data = await analysisApi.analyzeFile(filePath, content);
       clearProgress();
       setProgress(100);
-      setStepLabel('Готово');
+      setStepLabel(t('common.done'));
       setResultsByFile(prev => ({ ...prev, [filePath]: data }));
 
       const msg = data.violations.length > 0
-        ? `📁 ${filePath}: найдено нарушений — ${data.violations.length}. ${data.summary}`
-        : `📁 ${filePath}: нарушений не найдено. ${data.summary}`;
+        ? t('analysis.fileViolations', { path: filePath, count: data.violations.length, summary: data.summary })
+        : t('analysis.fileClean', { path: filePath, summary: data.summary });
       setMessages(prev => [...prev, {
         role: 'assistant', content: msg, timestamp: new Date().toISOString(),
       }]);
@@ -75,13 +77,13 @@ export function useAnalysis() {
       setProgress(100);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '⚠️ Бэкенд недоступен. Запустите start-backend.bat и повторите.',
+        content: t('err.backendOfflineRetry'),
         timestamp: new Date().toISOString(),
       }]);
     } finally {
       setTimeout(() => { setAnalyzing(false); setProgress(0); }, 600);
     }
-  }, []);
+  }, [t]);
 
   // ---------- Repository analysis (SSE) ----------
   const analyzeRepository = useCallback(() => {
@@ -89,7 +91,7 @@ export function useAnalysis() {
     closeStream();
     setAnalyzing(true);
     setProgress(0);
-    setStepLabel('Поиск файлов...');
+    setStepLabel(t('analysis.searchingFiles'));
 
     const es = new EventSource('/api/analysis/repository/stream');
     esRef.current = es;
@@ -123,7 +125,7 @@ export function useAnalysis() {
       switch (data.type) {
         case 'start':
           totalFiles = (data.total as number) ?? 0;
-          setStepLabel(totalFiles === 0 ? 'Файлов для анализа не найдено' : `Найдено файлов: ${totalFiles}`);
+          setStepLabel(totalFiles === 0 ? t('analysis.noFilesFound') : t('analysis.filesFound', { total: totalFiles }));
           break;
 
         case 'file': {
@@ -141,17 +143,17 @@ export function useAnalysis() {
         case 'done': {
           const total = (data.total as number) ?? totalFiles;
           setProgress(100);
-          setStepLabel('Готово');
-          finish(`📊 Анализ проекта завершён. Файлов: ${total}, нарушений: ${aggregatedViolations}.`, true);
+          setStepLabel(t('common.done'));
+          finish(t('analysis.projectDone', { total, violations: aggregatedViolations }), true);
           break;
         }
 
         case 'aborted':
-          finish(`⚠️ Сканирование прервано после ${data.index ?? '?'}/${data.total ?? '?'} файлов: ${data.error}`);
+          finish(t('analysis.aborted', { index: String(data.index ?? '?'), total: String(data.total ?? '?'), error: String(data.error) }));
           break;
 
         case 'error':
-          finish(`⚠️ Ошибка сканирования проекта: ${data.error}`);
+          finish(t('analysis.scanError', { error: String(data.error) }));
           break;
       }
     };
@@ -159,9 +161,9 @@ export function useAnalysis() {
     es.onerror = () => {
       // EventSource fires onerror when stream closes normally too.
       if (streamFinished) return;
-      finish('⚠️ Соединение с бэкендом потеряно во время анализа.');
+      finish(t('analysis.connectionLost'));
     };
-  }, []);
+  }, [t]);
 
   const cancelAnalysis = useCallback(() => {
     closeStream();
@@ -180,13 +182,13 @@ export function useAnalysis() {
       }).catch(() => {
         setMessages(cur => [...cur, {
           role: 'assistant',
-          content: '⚠️ Бэкенд недоступен. Запустите start-backend.bat.',
+          content: t('err.backendOffline'),
           timestamp: new Date().toISOString(),
         }]);
       });
       return updated;
     });
-  }, []);
+  }, [t]);
 
   const clearFileResult = useCallback((path: string) => {
     setResultsByFile(prev => {
@@ -204,10 +206,10 @@ export function useAnalysis() {
   const clearMessages = useCallback(() => {
     setMessages([{
       role: 'system',
-      content: 'История чата очищена. Готов к новым вопросам.',
+      content: t('analysis.chatCleared'),
       timestamp: new Date().toISOString(),
     }]);
-  }, []);
+  }, [t]);
 
   return {
     resultsByFile, messages, analyzing, progress, stepLabel,

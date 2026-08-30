@@ -9,6 +9,7 @@ import {
 import type { ChatMessage, Violation, AnalysisScope } from '../types';
 import { ReviewTab } from './ReviewTab';
 import type { ReviewMode, ReviewState } from '../hooks/useReview';
+import { useI18n } from '../i18n';
 
 export type AIView = AnalysisScope | 'chat' | 'review';
 
@@ -34,13 +35,6 @@ interface Props {
   onOpenFile: (path: string) => void;
 }
 
-const SCOPE_TABS: { value: AnalysisScope; label: string }[] = [
-  { value: 'file',       label: 'Файл' },
-  { value: 'commit',     label: 'Коммит' },
-  { value: 'pr',         label: 'PR/MR' },
-  { value: 'repository', label: 'Репо' },
-];
-
 const QUICK_PROMPTS = ['#explain', '#refactor', '#security', '#blame'];
 
 const severityBg: Record<string, string> = {
@@ -53,12 +47,6 @@ const severityBadge: Record<string, string> = {
   critical: 'text-orange-400 bg-orange-400/10',
   warning:  'text-yellow-400 bg-yellow-400/10',
   info:     'text-blue-400 bg-blue-400/10',
-};
-
-const severityLabel: Record<string, string> = {
-  critical: 'КРИТИЧНО',
-  warning:  'ВАЖНО',
-  info:     'ИНФО',
 };
 
 const categoryBadge: Record<string, string> = {
@@ -74,8 +62,16 @@ export function AIPanel({
   reviewing, reviewState, reviewError, activeFilePath, hasWorkspace,
   onReviewFile, onReviewChanges, onOpenFile,
 }: Props) {
+  const { t } = useI18n();
   const [input, setInput] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  const SCOPE_TABS: { value: AnalysisScope; label: string }[] = [
+    { value: 'file',       label: t('ai.scopeFile') },
+    { value: 'commit',     label: t('ai.scopeCommit') },
+    { value: 'pr',         label: 'PR/MR' },
+    { value: 'repository', label: t('ai.scopeRepo') },
+  ];
 
   useEffect(() => {
     if (view === 'chat') chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,7 +94,7 @@ export function AIPanel({
       <div className="p-3 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117] flex-shrink-0">
         <span className="text-xs font-bold text-gray-300 flex items-center">
           <FontAwesomeIcon icon={faBrain} className="mr-2 text-blue-400" />
-          AI Инсайты
+          {t('ai.insights')}
           {view === 'file' && violations.length > 0 && (
             <span className="ml-2 text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
               {violations.length}
@@ -109,10 +105,10 @@ export function AIPanel({
           <button
             onClick={onResetData}
             title={
-              view === 'file'       ? 'Сбросить результаты по текущему файлу' :
-              view === 'repository' ? 'Сбросить все результаты анализа проекта' :
-              view === 'chat'       ? 'Очистить историю чата' :
-              'Сбросить данные для этой вкладки'
+              view === 'file'       ? t('ai.resetFile') :
+              view === 'repository' ? t('ai.resetRepo') :
+              view === 'chat'       ? t('ai.resetChat') :
+              t('ai.resetTab')
             }
             className="hover:text-white transition-colors"
           >
@@ -120,7 +116,7 @@ export function AIPanel({
           </button>
           <button
             onClick={onToggleTabsCollapsed}
-            title={tabsCollapsed ? 'Показать все вкладки' : 'Скрыть неактивные scope-вкладки'}
+            title={tabsCollapsed ? t('ai.showAllTabs') : t('ai.hideInactiveTabs')}
             className={`transition-colors ${tabsCollapsed ? 'text-blue-400' : 'hover:text-white'}`}
           >
             <FontAwesomeIcon icon={tabsCollapsed ? faCompressAlt : faExpandAlt} />
@@ -152,10 +148,10 @@ export function AIPanel({
               ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500'
               : 'text-gray-500 hover:text-gray-300'
           }`}
-          title="Агент код-ревью"
+          title={t('ai.reviewTooltip')}
         >
           <FontAwesomeIcon icon={faClipboardCheck} className="mr-1" />
-          Ревью
+          {t('ai.reviewTab')}
         </button>
         <button
           onClick={() => onViewChange('chat')}
@@ -166,7 +162,7 @@ export function AIPanel({
           }`}
         >
           <FontAwesomeIcon icon={faComments} className="mr-1" />
-          Чат
+          {t('ai.chatTab')}
           {unreadHint && (
             <span className="absolute top-1 right-2 w-1.5 h-1.5 bg-blue-400 rounded-full" />
           )}
@@ -174,10 +170,10 @@ export function AIPanel({
       </div>
 
       {/* Content per tab */}
-      {view === 'file' && <FileTabContent violations={violations} onJumpToLine={onJumpToLine} onApplyFix={onApplyFix} />}
-      {view === 'commit' && <PlaceholderTab title="Анализ коммита" hint="Выбор коммита и сравнение с предыдущим — в разработке" />}
-      {view === 'pr' && <PlaceholderTab title="Анализ Pull / Merge Request" hint="Интеграция с GitHub/GitLab API — в разработке" />}
-      {view === 'repository' && <PlaceholderTab title="Сканирование репозитория" hint="Полное сканирование с группировкой нарушений — в разработке" />}
+      {view === 'file' && <FileTabContent violations={violations} onJumpToLine={onJumpToLine} onApplyFix={onApplyFix} t={t} />}
+      {view === 'commit' && <PlaceholderTab title={t('ai.commitAnalysis')} hint={t('ai.commitHint')} />}
+      {view === 'pr' && <PlaceholderTab title={t('ai.prAnalysis')} hint={t('ai.prHint')} />}
+      {view === 'repository' && <PlaceholderTab title={t('ai.repoScan')} hint={t('ai.repoScanHint')} />}
 
       {view === 'review' && (
         <ReviewTab
@@ -200,6 +196,7 @@ export function AIPanel({
           setInput={setInput}
           onSend={handleSend}
           chatBottomRef={chatBottomRef}
+          t={t}
         />
       )}
     </aside>
@@ -207,10 +204,11 @@ export function AIPanel({
 
   // --- Sub-components ---
 
-  function FileTabContent({ violations, onJumpToLine, onApplyFix }: {
+  function FileTabContent({ violations, onJumpToLine, onApplyFix, t }: {
     violations: Violation[];
     onJumpToLine: (line: number) => void;
     onApplyFix: (v: Violation) => void;
+    t: (key: string, vars?: Record<string, string | number>) => string;
   }) {
     if (violations.length === 0) {
       return (
@@ -218,9 +216,9 @@ export function AIPanel({
           <div>
             <FontAwesomeIcon icon={faCheckCircle} className="text-3xl text-gray-600 mb-2" />
             <p className="text-xs text-gray-400 leading-relaxed">
-              Нарушений нет.<br />
-              Нажмите кнопку анализа<br />
-              или измените правила.
+              {t('ai.noViolations')}<br />
+              {t('ai.noViolationsHint1')}<br />
+              {t('ai.noViolationsHint2')}
             </p>
           </div>
         </div>
@@ -233,19 +231,19 @@ export function AIPanel({
             key={i}
             className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${severityBg[v.severity]}`}
             onClick={() => onJumpToLine(v.line_start)}
-            title="Перейти к строке"
+            title={t('ai.jumpToLine')}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${severityBadge[v.severity]}`}>
-                  {severityLabel[v.severity]}
+                  {t(`sev.${v.severity}`)}
                 </span>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${categoryBadge[v.category]}`}>
                   {v.category.toUpperCase()}
                 </span>
               </div>
               <span className="text-[10px] text-gray-500 flex items-center">
-                стр. {v.line_start}{v.line_end !== v.line_start ? `–${v.line_end}` : ''}
+                {t('ai.line', { line: v.line_start })}{v.line_end !== v.line_start ? `–${v.line_end}` : ''}
                 <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[8px]" />
               </span>
             </div>
@@ -267,7 +265,7 @@ export function AIPanel({
               className="w-full text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/30 py-1 rounded transition-colors flex items-center justify-center"
             >
               <FontAwesomeIcon icon={faTools} className="mr-1.5 text-[9px]" />
-              Спросить LLM об исправлении →
+              {t('ai.askFix')}
             </button>
           </div>
         ))}
@@ -288,12 +286,13 @@ function PlaceholderTab({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef }: {
+function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }: {
   messages: ChatMessage[];
   input: string;
   setInput: (v: string) => void;
   onSend: () => void;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   return (
     <>
@@ -304,7 +303,7 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef }: {
               <div key={i} className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg text-xs leading-relaxed">
                 <div className="font-bold text-blue-400 mb-1 flex items-center">
                   <FontAwesomeIcon icon={faInfoCircle} className="mr-1" />
-                  Контекст
+                  {t('ai.context')}
                 </div>
                 {msg.content}
               </div>
@@ -348,7 +347,7 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef }: {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && onSend()}
-            placeholder="Спросить AI о коде..."
+            placeholder={t('ai.chatPlaceholder')}
             className="w-full bg-[#161b22] border border-[#30363d] rounded-md py-2 pl-3 pr-10 text-xs focus:outline-none focus:border-blue-500 text-gray-200"
           />
           <button onClick={onSend} className="absolute right-2 top-1.5 text-blue-500 hover:text-blue-400">

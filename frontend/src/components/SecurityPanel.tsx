@@ -8,6 +8,7 @@ import {
 import type { SecurityFinding, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport } from '../types';
 import { PentestView } from './PentestView';
 import { AuditView } from './AuditView';
+import { useI18n } from '../i18n';
 
 interface Props {
   hasWorkspace: boolean;
@@ -46,26 +47,6 @@ const sevBadge: Record<SecurityFinding['severity'], string> = {
   info: 'text-blue-400 bg-blue-400/10',
 };
 
-const sevLabel: Record<SecurityFinding['severity'], string> = {
-  critical: 'CRIT',
-  warning: 'WARN',
-  info: 'INFO',
-};
-
-const toolLabel: Record<string, string> = {
-  semgrep: 'SAST',
-  gitleaks: 'Секреты',
-  secrets: 'Секреты',
-  'pip-audit': 'Завис.',
-  'npm-audit': 'Завис.',
-};
-
-const verIcon: Record<string, { icon: typeof faCheckCircle; cls: string; title: string }> = {
-  confirmed: { icon: faCheckCircle, cls: 'text-red-400', title: 'Подтверждено LLM-верификатором' },
-  false_positive: { icon: faXmark, cls: 'text-green-500', title: 'Опровергнуто LLM-верификатором' },
-  unverified: { icon: faCircleQuestion, cls: 'text-gray-600', title: 'Без верификации' },
-};
-
 const TOOL_NAMES: [string, string][] = [
   ['semgrep', 'Semgrep'], ['gitleaks', 'Gitleaks'], ['pip_audit', 'pip-audit'], ['npm', 'npm'],
 ];
@@ -75,6 +56,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
   onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding,
   pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan,
   auditReport, auditRunning, auditError, onAuditRun, onAuditExportHtml }: Props) {
+  const { t } = useI18n();
   const [verify, setVerify] = useState(true);
   const [view, setView] = useState<'code' | 'pentest' | 'audit'>('code');
 
@@ -83,10 +65,30 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
   const auditMode = view === 'audit';
   const codeMode = view === 'code';
 
+  const sevLabel: Record<SecurityFinding['severity'], string> = {
+    critical: t('sev.critical'),
+    warning: t('sev.warning'),
+    info: t('sev.info'),
+  };
+
+  const toolLabel: Record<string, string> = {
+    semgrep: t('security.toolSast'),
+    gitleaks: t('security.toolSecrets'),
+    secrets: t('security.toolSecrets'),
+    'pip-audit': t('security.toolDeps'),
+    'npm-audit': t('security.toolDeps'),
+  };
+
+  const verIcon: Record<string, { icon: typeof faCheckCircle; cls: string; title: string }> = {
+    confirmed: { icon: faCheckCircle, cls: 'text-red-400', title: t('security.verConfirmed') },
+    false_positive: { icon: faXmark, cls: 'text-green-500', title: t('security.verFalsePositive') },
+    unverified: { icon: faCircleQuestion, cls: 'text-gray-600', title: t('security.verUnverified') },
+  };
+
   return (
     <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
       <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
-        Безопасность
+        {t('security.title')}
       </div>
 
       {/* Переключатель SAST / DAST / Аудит */}
@@ -95,21 +97,21 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
           onClick={() => setView('code')}
           className={`flex-1 py-1 transition-colors ${codeMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Скан
+          {t('security.viewScan')}
         </button>
         <button
           onClick={() => setView('pentest')}
           className={`flex-1 py-1 transition-colors ${pentestMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
-          title="Пентест работающего приложения"
+          title={t('security.pentestTitle')}
         >
-          Пентест
+          {t('security.viewPentest')}
         </button>
         <button
           onClick={() => setView('audit')}
           className={`flex-1 py-1 transition-colors ${auditMode ? 'bg-red-600/20 text-red-400' : 'text-gray-500 hover:text-gray-300'}`}
-          title="Мульти-агентный аудит: суб-агенты по доменам + синтезатор"
+          title={t('security.auditTitle')}
         >
-          Аудит
+          {t('security.viewAudit')}
         </button>
       </div>
 
@@ -139,7 +141,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
       {!pentestMode && !auditMode && !hasWorkspace && (
         <div className="p-4 text-center">
           <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-          <p className="text-xs text-gray-500">Откройте проект,<br />чтобы запустить сканирование</p>
+          <p className="text-xs text-gray-500">{t('security.openProjectHint1')}<br />{t('security.openProjectHint2')}</p>
         </div>
       )}
 
@@ -151,7 +153,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
               {TOOL_NAMES.map(([key, name]) => (
                 <span
                   key={key}
-                  title={tools[key] ? `${name} доступен` : `${name} не установлен`}
+                  title={tools[key] ? t('security.toolAvailable', { name }) : t('security.toolMissing', { name })}
                   className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${
                     tools[key] ? 'text-green-400 bg-green-400/10' : 'text-gray-600 bg-gray-600/10 line-through'
                   }`}
@@ -172,7 +174,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
               {scanning
                 ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1.5" />
                 : <FontAwesomeIcon icon={faShieldHalved} className="mr-1.5" />}
-              {scanning ? 'Сканирование...' : 'Сканировать проект'}
+              {scanning ? t('security.scanning') : t('security.scanProject')}
             </button>
             <label className="flex items-center text-[10px] text-gray-500 cursor-pointer select-none">
               <input
@@ -181,7 +183,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                 onChange={e => setVerify(e.target.checked)}
                 className="mr-1.5 accent-red-500"
               />
-              LLM-верификация находок (топ-10)
+              {t('security.verify')}
             </label>
             <button
               onClick={onToggleWatch}
@@ -189,11 +191,11 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                 watching
                   ? 'bg-green-600/20 border-green-500/40 text-green-400'
                   : 'border-[#30363d] bg-[#161b22] text-gray-400 hover:border-green-500/40 hover:text-green-300'}`}
-              title="Watch-режим: авто-перескан при изменении файлов (SSE)"
+              title={t('security.watchTitle')}
             >
               {watching
-                ? `● Watch: слежу${lastWatchScan ? ` · скан ${lastWatchScan}` : ''}`
-                : '○ Watch-режим (авто-перескан при сохранении)'}
+                ? t('security.watchOn') + (lastWatchScan ? t('security.watchLast', { time: lastWatchScan }) : '')
+                : t('security.watchOff')}
             </button>
 
             {/* Baseline + SARIF */}
@@ -202,16 +204,16 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                 <>
                   <div
                     className="flex-1 text-[9px] text-gray-500 bg-[#161b22] border border-[#30363d] rounded px-2 py-1 truncate"
-                    title={`Baseline от ${baseline.created_at}${baseline.head ? `, коммит ${baseline.head}` : ''}`}
+                    title={t('security.baselineTitle', { date: baseline.created_at }) + (baseline.head ? t('security.baselineCommit', { head: baseline.head }) : '')}
                   >
                     <FontAwesomeIcon icon={faBookmark} className="mr-1 text-blue-400" />
-                    baseline: {baseline.findings} нах. {baseline.head && `· ${baseline.head}`}
+                    {t('security.baselineLabel', { count: baseline.findings })} {baseline.head && `· ${baseline.head}`}
                   </div>
                   <button
                     onClick={onDropBaseline}
                     disabled={busyBaseline}
                     className="px-2 text-[10px] text-gray-500 hover:text-red-400 border border-[#30363d] rounded transition-colors disabled:opacity-40"
-                    title="Удалить baseline"
+                    title={t('security.dropBaseline')}
                   >
                     <FontAwesomeIcon icon={faTrash} />
                   </button>
@@ -221,17 +223,17 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                   onClick={onSaveBaseline}
                   disabled={busyBaseline || scanning}
                   className="flex-1 text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-400 hover:text-blue-300 hover:border-blue-500/40 transition-colors disabled:opacity-40 flex items-center justify-center"
-                  title="Запомнить текущие находки как baseline — следующие сканы покажут новые/исправленные"
+                  title={t('security.baselineSaveTitle')}
                 >
                   <FontAwesomeIcon icon={faBookmark} className="mr-1" />
-                  {busyBaseline ? 'Сохранение...' : 'Сделать baseline'}
+                  {busyBaseline ? t('security.baselineSaving') : t('security.makeBaseline')}
                 </button>
               )}
               <button
                 onClick={onDownloadSarif}
                 disabled={scanning}
                 className="px-2 text-[10px] text-gray-500 hover:text-green-400 border border-[#30363d] rounded transition-colors disabled:opacity-40"
-                title="Скачать SARIF (GitHub Code Scanning / CI)"
+                title={t('security.sarifTitle')}
               >
                 <FontAwesomeIcon icon={faFileExport} />
               </button>
@@ -251,15 +253,15 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                 {/* Summary */}
                 <div className="px-3 py-2 space-y-1.5 border-b border-[#30363d]">
                   <div className="flex items-center space-x-2 text-[10px] flex-wrap gap-y-1">
-                    <span className="text-red-400 font-bold">{report.summary.by_severity.critical} crit</span>
-                    <span className="text-yellow-400 font-bold">{report.summary.by_severity.warning} warn</span>
-                    <span className="text-blue-400 font-bold">{report.summary.by_severity.info} info</span>
+                    <span className="text-red-400 font-bold">{report.summary.by_severity.critical} {t('security.sumCrit')}</span>
+                    <span className="text-yellow-400 font-bold">{report.summary.by_severity.warning} {t('security.sumWarn')}</span>
+                    <span className="text-blue-400 font-bold">{report.summary.by_severity.info} {t('security.sumInfo')}</span>
                     {report.summary.confirmed > 0 && (
-                      <span className="text-gray-400">· {report.summary.confirmed} подтв.</span>
+                      <span className="text-gray-400">{t('security.confirmed', { count: report.summary.confirmed })}</span>
                     )}
                     {report.summary.suppressed > 0 && (
-                      <span className="text-gray-600" title="Подавлены комментариями ccl:ignore">
-                        · {report.summary.suppressed} подавл.
+                      <span className="text-gray-600" title={t('security.suppressedTitle')}>
+                        {t('security.suppressed', { count: report.summary.suppressed })}
                       </span>
                     )}
                   </div>
@@ -267,10 +269,10 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                   {report.diff && report.baseline && (
                     <div className="flex items-center space-x-2 text-[10px]">
                       <span className={report.diff.new > 0 ? 'text-red-400 font-bold' : 'text-gray-500'}>
-                        +{report.diff.new} новых
+                        {t('security.diffNew', { count: report.diff.new })}
                       </span>
                       <span className={report.diff.fixed > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}>
-                        −{report.diff.fixed} исправлено
+                        {t('security.diffFixed', { count: report.diff.fixed })}
                       </span>
                       <span className="text-gray-600 code-font text-[9px]">vs {report.baseline.head ?? report.baseline.created_at.slice(0, 10)}</span>
                     </div>
@@ -278,11 +280,19 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                   {/* Coverage */}
                   <div
                     className="text-[9px] text-gray-600"
-                    title={`Всего файлов: ${report.coverage.total_files}; кода: ${report.coverage.code_files}; SAST просканировано: ${report.coverage.sast_scanned}; секреты: ${report.coverage.secrets_scanned}; пропущено: бинарных ${report.coverage.skipped.binary}, больших ${report.coverage.skipped.too_large}, не-кода ${report.coverage.skipped.non_code}`}
+                    title={t('security.coverageTitle', {
+                      total: report.coverage.total_files,
+                      code: report.coverage.code_files,
+                      sast: report.coverage.sast_scanned,
+                      secrets: report.coverage.secrets_scanned,
+                      bin: report.coverage.skipped.binary,
+                      large: report.coverage.skipped.too_large,
+                      noncode: report.coverage.skipped.non_code,
+                    })}
                   >
-                    Покрытие: {report.coverage.sast_scanned}/{report.coverage.code_files} файлов кода
+                    {t('security.coverage', { sast: report.coverage.sast_scanned, code: report.coverage.code_files })}
                     {(report.coverage.skipped.binary + report.coverage.skipped.too_large) > 0 &&
-                      ` · пропущено ${report.coverage.skipped.binary + report.coverage.skipped.too_large}`}
+                      t('security.coverageSkipped', { count: report.coverage.skipped.binary + report.coverage.skipped.too_large })}
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {Object.entries(report.summary.by_cwe).map(([cwe, n]) => (
@@ -301,7 +311,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                 {/* Findings */}
                 {report.findings.length === 0 && (
                   <p className="px-3 mt-3 text-[11px] text-gray-500 text-center">
-                    Находок нет — проект чист по доступным движкам
+                    {t('security.noFindings')}
                   </p>
                 )}
                 {report.findings.map(f => {
@@ -313,7 +323,7 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                       className={`w-full text-left px-3 py-2 border-b border-[#21262d] hover:bg-[#161b22] transition-colors ${
                         f.suppressed || f.verification.status === 'false_positive' ? 'opacity-45' : ''
                       }`}
-                      title={`${f.path}:${f.line_start}\n${f.message}${f.suppressed ? '\nПодавлено: ccl:ignore' : ''}${f.verification.rationale ? '\nВерификатор: ' + f.verification.rationale : ''}`}
+                      title={`${f.path}:${f.line_start}\n${f.message}${f.suppressed ? t('security.suppressedNote') : ''}${f.verification.rationale ? t('security.verifierNote', { rationale: f.verification.rationale }) : ''}`}
                     >
                       <div className="flex items-center space-x-1.5">
                         <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${sevBadge[f.severity]}`}>
@@ -321,12 +331,12 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
                         </span>
                         {f.is_new === true && (
                           <span className="text-[9px] font-bold px-1 py-0.5 rounded text-red-300 bg-red-500/20 border border-red-500/30">
-                            NEW
+                            {t('security.badgeNew')}
                           </span>
                         )}
                         {f.suppressed && (
                           <span className="text-[9px] font-bold px-1 py-0.5 rounded text-gray-500 bg-gray-500/20">
-                            SUPPR
+                            {t('security.badgeSuppr')}
                           </span>
                         )}
                         <span className="text-[9px] px-1 py-0.5 rounded text-gray-500 bg-gray-500/10">
@@ -358,9 +368,9 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
               <div className="p-6 text-center">
                 <FontAwesomeIcon icon={faShieldHalved} className="text-3xl text-gray-600 mb-2" />
                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                  Детерминированный скан: SAST (Semgrep),<br />
-                  секреты, уязвимые зависимости.<br />
-                  LLM только верифицирует находки.
+                  {t('security.scanDesc1')}<br />
+                  {t('security.scanDesc2')}<br />
+                  {t('security.scanDesc3')}
                 </p>
               </div>
             )}

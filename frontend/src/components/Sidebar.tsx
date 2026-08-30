@@ -10,6 +10,7 @@ import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
 import { SecurityPanel } from './SecurityPanel';
 import { QualityPanel } from './QualityPanel';
+import { useI18n, LOCALES } from '../i18n';
 
 interface Props {
   panel: 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
@@ -68,7 +69,11 @@ const categoryColor: Record<string, string> = {
   analysis: 'text-orange-400 bg-orange-400/10',
 };
 
+const categoryLabelKey = (cat: string) =>
+  'rules.category' + cat.charAt(0).toUpperCase() + cat.slice(1);
+
 function SettingsPanel() {
+  const { t, locale, setLocale } = useI18n();
   const [provider, setProvider] = useState('lmstudio');
   const [baseUrl, setBaseUrl] = useState('http://localhost:1234/v1');
   const [model, setModel] = useState('local-model');
@@ -100,16 +105,26 @@ function SettingsPanel() {
 
   return (
     <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
-      <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider">Настройки LLM</div>
+      <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider">{t('sidebar.settingsTitle')}</div>
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 space-y-4 pb-4">
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">Провайдер</label>
+          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('settings.language')}</label>
+          <select
+            value={locale}
+            onChange={e => setLocale(e.target.value as typeof locale)}
+            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          >
+            {LOCALES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.provider')}</label>
           <select
             value={provider}
             onChange={e => setProvider(e.target.value)}
             className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="lmstudio">LM Studio (локальный)</option>
+            <option value="lmstudio">{t('sidebar.providerLmstudio')}</option>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic</option>
           </select>
@@ -124,7 +139,7 @@ function SettingsPanel() {
           />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">Модель</label>
+          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.model')}</label>
           <input
             type="text"
             value={model}
@@ -133,7 +148,7 @@ function SettingsPanel() {
           />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">API Key (необязательно)</label>
+          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.apiKeyOptional')}</label>
           <input
             type="password"
             value={apiKey}
@@ -151,9 +166,9 @@ function SettingsPanel() {
             'bg-blue-600/20 hover:bg-blue-600/40 border-blue-500/30 text-blue-400'
           }`}
         >
-          {status === 'saving' ? 'Сохранение...' :
-           status === 'saved'  ? '✓ Сохранено' :
-           status === 'error'  ? '✗ Ошибка' : 'Сохранить настройки'}
+          {status === 'saving' ? t('sidebar.saving') :
+           status === 'saved'  ? t('sidebar.saved') :
+           status === 'error'  ? t('sidebar.saveError') : t('sidebar.saveSettings')}
         </button>
       </div>
     </aside>
@@ -161,6 +176,7 @@ function SettingsPanel() {
 }
 
 export function Sidebar(props: Props) {
+  const { t } = useI18n();
   const {
     panel, workspace, tree, activeFile, resultsByFile, backendOnline,
     onFileOpen, onOpenPicker, onCloseWorkspace,
@@ -172,11 +188,11 @@ export function Sidebar(props: Props) {
     return (
       <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
         <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider flex justify-between items-center">
-          <span>Правила {rules.length > 0 && <span className="text-gray-400 normal-case">({activeCount}/{rules.length} активно)</span>}</span>
+          <span>{t('sidebar.rules')} {rules.length > 0 && <span className="text-gray-400 normal-case">({t('sidebar.rulesActive', { active: activeCount, total: rules.length })})</span>}</span>
           <button
             onClick={onCreateRuleManually}
             className="text-blue-400 hover:text-blue-300 transition-colors"
-            title="Создать правило вручную"
+            title={t('sidebar.createRuleManuallyTitle')}
           >
             <FontAwesomeIcon icon={faPlus} />
           </button>
@@ -188,16 +204,16 @@ export function Sidebar(props: Props) {
           className="mx-2 mb-2 py-1.5 text-xs bg-blue-600/15 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 rounded transition-colors flex items-center justify-center"
         >
           <FontAwesomeIcon icon={faPlus} className="mr-1.5" />
-          Новое правило
+          {t('sidebar.newRule')}
         </button>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-2 pb-4">
           {rules.length === 0 && (
             <div className="text-center mt-6 px-2">
               <p className="text-xs text-gray-500 leading-relaxed">
-                Правил пока нет.<br />
-                Создайте вручную кнопкой выше,<br />
-                либо выделите код в редакторе.
+                {t('sidebar.noRulesLine1')}<br />
+                {t('sidebar.noRulesLine2')}<br />
+                {t('sidebar.noRulesLine3')}
               </p>
             </div>
           )}
@@ -210,7 +226,7 @@ export function Sidebar(props: Props) {
             >
               <div className="flex items-center justify-between">
                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${categoryColor[rule.category]}`}>
-                  {rule.category.toUpperCase()}
+                  {t(categoryLabelKey(rule.category)).toUpperCase()}
                 </span>
                 <button
                   onClick={() => onToggleRule(rule.id, !rule.enabled)}
@@ -219,9 +235,9 @@ export function Sidebar(props: Props) {
                       ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                       : 'bg-gray-600/30 text-gray-500 hover:bg-gray-500/40'
                   }`}
-                  title={rule.enabled ? 'Кликните чтобы отключить' : 'Кликните чтобы включить'}
+                  title={rule.enabled ? t('rules.clickToDisable') : t('rules.clickToEnable')}
                 >
-                  {rule.enabled ? '● АКТИВНО' : '○ ОТКЛ.'}
+                  {rule.enabled ? t('rules.stateActive') : t('rules.stateInactive')}
                 </button>
               </div>
               <p className="text-[11px] text-gray-300 leading-relaxed font-medium">{rule.description}</p>
@@ -230,20 +246,20 @@ export function Sidebar(props: Props) {
                 <button
                   onClick={() => onEditRule(rule)}
                   className="px-2 py-0.5 text-[9px] text-gray-400 hover:text-blue-300 transition-colors flex items-center"
-                  title="Редактировать"
+                  title={t('common.edit')}
                 >
                   <FontAwesomeIcon icon={faPencil} className="mr-1" />
-                  Изменить
+                  {t('common.edit')}
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm(`Удалить правило «${rule.description}»?`)) onDeleteRule(rule.id);
+                    if (confirm(t('rules.deleteConfirm', { description: rule.description }))) onDeleteRule(rule.id);
                   }}
                   className="px-2 py-0.5 text-[9px] text-gray-400 hover:text-red-400 transition-colors flex items-center"
-                  title="Удалить"
+                  title={t('common.delete')}
                 >
                   <FontAwesomeIcon icon={faTrash} className="mr-1" />
-                  Удалить
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
@@ -312,11 +328,11 @@ export function Sidebar(props: Props) {
   return (
     <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
       <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider flex justify-between items-center">
-        <span>Проводник</span>
+        <span>{t('sidebar.explorer')}</span>
         <button
           onClick={onOpenPicker}
           className="text-gray-400 hover:text-white transition-colors text-xs"
-          title="Открыть/сменить проект"
+          title={t('sidebar.openOrSwitchProject')}
         >
           <FontAwesomeIcon icon={faFolderOpen} />
         </button>
@@ -326,7 +342,7 @@ export function Sidebar(props: Props) {
       {!backendOnline && (
         <div className="mx-2 my-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-[10px] text-red-400 flex items-start">
           <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1.5 mt-0.5 flex-shrink-0" />
-          <span>Бэкенд не отвечает.<br />Запустите start-backend.bat</span>
+          <span>{t('sidebar.backendOfflineLine1')}<br />{t('sidebar.backendOfflineLine2')}</span>
         </div>
       )}
 
@@ -343,7 +359,7 @@ export function Sidebar(props: Props) {
             <button
               onClick={onCloseWorkspace}
               className="ml-2 text-gray-500 hover:text-red-400 text-xs"
-              title="Закрыть проект"
+              title={t('sidebar.closeProject')}
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
@@ -355,13 +371,13 @@ export function Sidebar(props: Props) {
           <div className="p-4 text-center">
             <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
             <p className="text-xs text-gray-500 mb-3">
-              Откройте локальную папку или<br />клонируйте Git-репозиторий
+              {t('sidebar.openFolderHint1')}<br />{t('sidebar.openFolderHint2')}
             </p>
             <button
               onClick={onOpenPicker}
               className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded transition-colors"
             >
-              Открыть проект
+              {t('sidebar.openProject')}
             </button>
           </div>
         )}
@@ -379,14 +395,14 @@ export function Sidebar(props: Props) {
         )}
 
         {workspace && !tree && (
-          <p className="text-xs text-gray-500 text-center py-4">Загрузка дерева...</p>
+          <p className="text-xs text-gray-500 text-center py-4">{t('sidebar.loadingTree')}</p>
         )}
 
         {/* Problems summary */}
         {Object.keys(resultsByFile).length > 0 && (
           <>
             <div className="mt-4 p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider border-t border-[#30363d]">
-              <FontAwesomeIcon icon={faDatabase} className="mr-1" /> Проблемы
+              <FontAwesomeIcon icon={faDatabase} className="mr-1" /> {t('sidebar.problems')}
             </div>
             <div className="px-3 space-y-1 pb-4">
               {Object.entries(resultsByFile).map(([path, res]) => (
@@ -414,7 +430,7 @@ export function Sidebar(props: Props) {
             className="w-full text-[10px] text-gray-400 hover:text-white py-1 px-2 rounded hover:bg-[#21262d] transition-colors flex items-center justify-center"
           >
             <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5" />
-            Сменить проект
+            {t('sidebar.switchProject')}
           </button>
         </div>
       )}

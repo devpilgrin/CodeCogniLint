@@ -5,6 +5,7 @@ import {
   faFire, faFileCode, faChartSimple,
 } from '@fortawesome/free-solid-svg-icons';
 import type { QualityFinding, QualityHotspot } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   hasWorkspace: boolean;
@@ -21,16 +22,16 @@ const catStyle: Record<string, string> = {
   'best-practices': 'bg-blue-500/15 border-blue-500/40 text-blue-400',
 };
 
-const catLabel: Record<string, string> = {
-  performance: 'ПРОИЗВ.',
-  'best-practices': 'ПРАКТИКИ',
-};
-
 const sevDot: Record<string, string> = {
   critical: 'text-red-400', warning: 'text-yellow-400', info: 'text-blue-400',
 };
 
 function FindingRow({ f, onOpen }: { f: QualityFinding; onOpen: (p: string, l: number) => void }) {
+  const { t } = useI18n();
+  const catLabel: Record<string, string> = {
+    performance: t('qcat.performance'),
+    'best-practices': t('qcat.bestPractices'),
+  };
   return (
     <button
       onClick={() => onOpen(f.path, f.line_start)}
@@ -87,8 +88,14 @@ function HotspotCard({ h, onOpen }: { h: QualityHotspot; onOpen: (p: string, l: 
 }
 
 export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onScan, onOpenFinding }: Props) {
+  const { t } = useI18n();
   const [review, setReview] = useState(false);
   const [tab, setTab] = useState<'hotspots' | 'findings' | 'metrics'>('hotspots');
+
+  const catLabel: Record<string, string> = {
+    performance: t('qcat.performance'),
+    'best-practices': t('qcat.bestPractices'),
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -100,7 +107,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
               className={`text-[9px] px-1.5 py-0.5 rounded border ${ok
                 ? 'text-green-400 border-green-500/30 bg-green-900/10'
                 : 'text-gray-600 border-[#30363d]'}`}
-              title={`${name}: ${ok ? 'доступен' : 'не установлен'}`}>
+              title={`${name}: ${ok ? t('quality.toolAvailable') : t('quality.toolMissing')}`}>
               {name}
             </span>
           ))}
@@ -113,11 +120,11 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
           {scanning
             ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1.5" />
             : <FontAwesomeIcon icon={faGaugeHigh} className="mr-1.5" />}
-          {scanning ? 'Анализ качества...' : 'Проверка качества кода'}
+          {scanning ? t('quality.scanning') : t('quality.scan')}
         </button>
         <label className="flex items-center text-[10px] text-gray-500 cursor-pointer select-none">
           <input type="checkbox" checked={review} onChange={e => setReview(e.target.checked)} className="mr-1.5 accent-orange-500" />
-          LLM-разбор hotspot'ов
+          {t('quality.review')}
         </label>
       </div>
 
@@ -125,7 +132,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
         {!hasWorkspace && (
           <div className="p-4 text-center">
             <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-            <p className="text-xs text-gray-500">Откройте проект для анализа качества</p>
+            <p className="text-xs text-gray-500">{t('quality.openProject')}</p>
           </div>
         )}
         {error && (
@@ -144,11 +151,11 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
               </div>
               <div className="p-1.5 rounded bg-[#161b22] border border-[#30363d]">
                 <div className="text-sm font-bold text-gray-200">{report.metrics.total_code_files}</div>
-                <div className="text-[9px] text-gray-500">файлов</div>
+                <div className="text-[9px] text-gray-500">{t('quality.files')}</div>
               </div>
               <div className="p-1.5 rounded bg-[#161b22] border border-[#30363d]">
                 <div className="text-sm font-bold text-orange-400">{report.total_findings}</div>
-                <div className="text-[9px] text-gray-500">находок</div>
+                <div className="text-[9px] text-gray-500">{t('quality.findings')}</div>
               </div>
             </div>
             <div className="flex mx-2 mt-1.5 text-[9px] space-x-2 text-gray-500">
@@ -159,7 +166,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
 
             {/* Вкладки */}
             <div className="flex mx-2 mt-2 rounded overflow-hidden border border-[#30363d] text-[10px] font-semibold">
-              {([['hotspots', 'Hotspots'], ['findings', `Находки (${report.total_findings})`], ['metrics', 'Метрики']] as const).map(([id, label]) => (
+              {([['hotspots', t('quality.tabHotspots')], ['findings', t('quality.tabFindings', { count: report.total_findings })], ['metrics', t('quality.tabMetrics')]] as const).map(([id, label]) => (
                 <button key={id} onClick={() => setTab(id)}
                   className={`flex-1 py-1 transition-colors ${tab === id ? 'bg-orange-600/20 text-orange-300' : 'bg-[#161b22] text-gray-500 hover:text-gray-300'}`}>
                   {label}
@@ -171,7 +178,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
               {tab === 'hotspots' && (
                 <>
                   {report.hotspots.length === 0 && (
-                    <p className="px-3 text-[11px] text-gray-500">Hotspot'ов нет — код компактный и простой.</p>
+                    <p className="px-3 text-[11px] text-gray-500">{t('quality.noHotspots')}</p>
                   )}
                   {report.hotspots.map(h => <HotspotCard key={h.path} h={h} onOpen={onOpenFinding} />)}
                 </>
@@ -179,7 +186,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
               {tab === 'findings' && (
                 <div className="px-2">
                   {report.findings.length === 0 && (
-                    <p className="text-[11px] text-gray-500">Нарушений производительности и практик не найдено.</p>
+                    <p className="text-[11px] text-gray-500">{t('quality.noFindings')}</p>
                   )}
                   {report.findings.map(f => <FindingRow key={f.id} f={f} onOpen={onOpenFinding} />)}
                 </div>
@@ -190,7 +197,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
                     <div>
                       <div className="text-[10px] uppercase font-bold text-gray-500 mb-1 flex items-center">
                         <FontAwesomeIcon icon={faFileCode} className="mr-1" />
-                        Большие файлы (&gt;{report.metrics.thresholds.file_loc} LOC)
+                        {t('quality.bigFiles', { loc: report.metrics.thresholds.file_loc })}
                       </div>
                       {report.metrics.big_files.map(f => (
                         <button key={f.path} onClick={() => onOpenFinding(f.path, 1)}
@@ -204,7 +211,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
                     <div>
                       <div className="text-[10px] uppercase font-bold text-gray-500 mb-1 flex items-center">
                         <FontAwesomeIcon icon={faChartSimple} className="mr-1" />
-                        Длинные функции (&gt;{report.metrics.thresholds.func_loc} строк)
+                        {t('quality.longFunctions', { loc: report.metrics.thresholds.func_loc })}
                       </div>
                       {report.metrics.long_functions.map(f => (
                         <button key={`${f.file}:${f.line}`} onClick={() => onOpenFinding(f.file, f.line)}
@@ -217,7 +224,7 @@ export function QualityPanel({ hasWorkspace, tools, report, scanning, error, onS
                   {report.metrics.complex_functions.length > 0 && (
                     <div>
                       <div className="text-[10px] uppercase font-bold text-gray-500 mb-1">
-                        Сложные функции (CC&gt;{report.metrics.thresholds.func_cc})
+                        {t('quality.complexFunctions', { cc: report.metrics.thresholds.func_cc })}
                       </div>
                       {report.metrics.complex_functions.map(f => (
                         <button key={`${f.file}:${f.line}`} onClick={() => onOpenFinding(f.file, f.line)}

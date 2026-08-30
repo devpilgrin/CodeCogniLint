@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faWandMagicSparkles, faFolderOpen, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { faJsSquare, faReact, faPython } from '@fortawesome/free-brands-svg-icons';
 import type { OpenTab, RuleCategory, Violation } from '../types';
+import { useI18n } from '../i18n';
 
 interface ContextMenu {
   x: number;
@@ -33,14 +34,15 @@ function tabIcon(lang: string) {
   return null;
 }
 
-const CATEGORY_ITEMS: { value: RuleCategory; label: string; color: string }[] = [
-  { value: 'syntax',   label: 'Синтаксис', color: 'text-blue-400' },
-  { value: 'semantic', label: 'Семантика', color: 'text-purple-400' },
-  { value: 'analysis', label: 'Анализ',    color: 'text-orange-400' },
-];
-
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
   const { tabs, activeTabIndex, violations, onTabSelect, onTabClose, onContentChange, onCreateRule } = props;
+  const { t } = useI18n();
+
+  const CATEGORY_ITEMS: { value: RuleCategory; label: string; color: string }[] = [
+    { value: 'syntax',   label: t('rulescat.syntax'), color: 'text-blue-400' },
+    { value: 'semantic', label: t('rulescat.semantic'), color: 'text-purple-400' },
+    { value: 'analysis', label: t('rulescat.analysis'), color: 'text-orange-400' },
+  ];
 
   const editorRef = useRef<monacoT.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof monacoT | null>(null);
@@ -143,8 +145,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
         <div className="flex-1 flex items-center justify-center text-gray-500">
           <div className="text-center">
             <FontAwesomeIcon icon={faFolderOpen} className="text-5xl mb-3 opacity-40" />
-            <p className="text-sm">Откройте файл из проводника</p>
-            <p className="text-xs text-gray-600 mt-1">или создайте правило из выделенного фрагмента</p>
+            <p className="text-sm">{t('editor.openFileHint')}</p>
+            <p className="text-xs text-gray-600 mt-1">{t('editor.orCreateRule')}</p>
           </div>
         </div>
       </main>
@@ -155,9 +157,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
     <main className="flex-1 flex flex-col bg-[#0d1117] relative min-w-0" ref={containerRef}>
       {/* Tabs */}
       <div className="h-9 bg-[#161b22] border-b border-[#30363d] flex items-center overflow-x-auto no-scrollbar flex-shrink-0">
-        {tabs.map((t, i) => (
+        {tabs.map((tabItem, i) => (
           <div
-            key={t.path}
+            key={tabItem.path}
             onClick={() => onTabSelect(i)}
             className={`group h-full pl-4 pr-2 flex items-center border-r border-[#30363d] text-xs cursor-pointer transition-colors flex-shrink-0 ${
               i === activeTabIndex
@@ -165,19 +167,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
                 : 'text-gray-500 hover:bg-[#21262d]'
             }`}
           >
-            {tabIcon(t.language)}
-            <span className="select-none">{t.name}</span>
-            {t.dirty && (
+            {tabIcon(tabItem.language)}
+            <span className="select-none">{tabItem.name}</span>
+            {tabItem.dirty && (
               <FontAwesomeIcon
                 icon={faCircle}
                 className="ml-2 text-[6px] text-gray-400 group-hover:hidden"
-                title="Несохранённые изменения"
+                title={t('editor.unsaved')}
               />
             )}
             <button
-              onClick={(e) => { e.stopPropagation(); onTabClose(t.path); }}
+              onClick={(e) => { e.stopPropagation(); onTabClose(tabItem.path); }}
               className="ml-2 w-4 h-4 rounded hover:bg-[#30363d] flex items-center justify-center text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Закрыть"
+              title={t('common.close')}
             >
               <FontAwesomeIcon icon={faTimes} className="text-[10px]" />
             </button>
@@ -219,7 +221,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
           onMouseLeave={() => setContextMenu(null)}
         >
           <div className="px-3 py-1 text-[10px] text-gray-500 uppercase font-semibold border-b border-[#30363d] mb-1">
-            Создать правило из выделения
+            {t('editor.createRuleFromSelection')}
           </div>
           {CATEGORY_ITEMS.map(({ value, label, color }) => (
             <button

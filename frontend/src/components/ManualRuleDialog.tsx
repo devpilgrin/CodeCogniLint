@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faPlus, faPencil } from '@fortawesome/free-solid-svg-icons';
 import type { Rule, RuleCategory } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   /** If provided, dialog is in edit mode; otherwise create mode. */
@@ -12,28 +13,20 @@ interface Props {
   onClose: () => void;
 }
 
-const CATEGORIES: { value: RuleCategory; label: string; desc: string; color: string }[] = [
-  { value: 'syntax',   label: 'Синтаксис', desc: 'Стиль, именование, форматирование',   color: 'border-blue-500 bg-blue-500/10' },
-  { value: 'semantic', label: 'Семантика',  desc: 'Логика и поведение',                  color: 'border-purple-500 bg-purple-500/10' },
-  { value: 'analysis', label: 'Анализ',     desc: 'Безопасность, техдолг, история Git', color: 'border-orange-500 bg-orange-500/10' },
+const CATEGORIES: { value: RuleCategory; descKey: string; color: string }[] = [
+  { value: 'syntax',   descKey: 'manualrule.catSyntaxDesc',   color: 'border-blue-500 bg-blue-500/10' },
+  { value: 'semantic', descKey: 'manualrule.catSemanticDesc', color: 'border-purple-500 bg-purple-500/10' },
+  { value: 'analysis', descKey: 'rules.categoryAnalysisDesc', color: 'border-orange-500 bg-orange-500/10' },
 ];
 
-const EXAMPLES: Record<RuleCategory, { description: string; pattern: string }> = {
-  syntax: {
-    description: 'Использовать только стрелочные функции для React-хуков',
-    pattern: 'Запретить function-declaration внутри тел useEffect, useMemo, useCallback. Допустимы только () => {} и () => value.',
-  },
-  semantic: {
-    description: 'Методы оплаты должны логировать результат',
-    pattern: 'Любая функция, имя которой содержит "pay", "charge", "refund" — должна вызывать logger.info с результатом операции до возврата.',
-  },
-  analysis: {
-    description: 'Не изменять модуль AuthService без покрытия тестами',
-    pattern: 'Изменения в файлах src/AuthService.* должны сопровождаться изменениями в tests/auth.* в том же коммите.',
-  },
-};
+const categoryLabelKey = (cat: RuleCategory) =>
+  'rules.category' + cat.charAt(0).toUpperCase() + cat.slice(1);
+
+const exampleKey = (cat: RuleCategory, field: string) =>
+  'manualrule.example' + cat.charAt(0).toUpperCase() + cat.slice(1) + field;
 
 export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }: Props) {
+  const { t } = useI18n();
   const isEdit = Boolean(initial);
   const [category, setCategory] = useState<RuleCategory>(initial?.category ?? 'semantic');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -44,9 +37,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
   useEffect(() => {
     if (isEdit) return;
     if (description.trim() === '' && patternDescription.trim() === '') {
-      const ex = EXAMPLES[category];
       // Use placeholder via separate state — handled via input's placeholder prop below
-      void ex;
     }
   }, [category, isEdit, description, patternDescription]);
 
@@ -64,9 +55,8 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
   };
 
   const fillExample = () => {
-    const ex = EXAMPLES[category];
-    setDescription(ex.description);
-    setPatternDescription(ex.pattern);
+    setDescription(t(exampleKey(category, 'Description')));
+    setPatternDescription(t(exampleKey(category, 'Pattern')));
   };
 
   return (
@@ -75,7 +65,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
         <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
           <h3 className="text-sm font-bold text-white flex items-center">
             <FontAwesomeIcon icon={isEdit ? faPencil : faPlus} className="mr-2 text-blue-400" />
-            {isEdit ? 'Редактировать правило' : 'Новое правило (вручную)'}
+            {isEdit ? t('manualrule.titleEdit') : t('manualrule.titleCreate')}
           </h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <FontAwesomeIcon icon={faTimes} />
@@ -85,7 +75,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
         <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
           {/* Category */}
           <div>
-            <p className="text-[10px] text-gray-500 uppercase font-semibold mb-2">Категория</p>
+            <p className="text-[10px] text-gray-500 uppercase font-semibold mb-2">{t('manualrule.categoryLabel')}</p>
             <div className="grid grid-cols-3 gap-2">
               {CATEGORIES.map(cat => (
                 <button
@@ -95,8 +85,8 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
                     category === cat.value ? cat.color : 'border-[#30363d] hover:border-gray-500 bg-[#0d1117]'
                   }`}
                 >
-                  <p className="text-xs text-gray-200 font-semibold">{cat.label}</p>
-                  <p className="text-[9px] text-gray-500 mt-0.5">{cat.desc}</p>
+                  <p className="text-xs text-gray-200 font-semibold">{t(categoryLabelKey(cat.value))}</p>
+                  <p className="text-[9px] text-gray-500 mt-0.5">{t(cat.descKey)}</p>
                 </button>
               ))}
             </div>
@@ -106,7 +96,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
           <div>
             <div className="flex justify-between items-baseline mb-1">
               <label className="text-[10px] text-gray-500 uppercase font-semibold">
-                Краткое описание <span className="text-red-400 normal-case">*</span>
+                {t('manualrule.descriptionLabel')} <span className="text-red-400 normal-case">*</span>
               </label>
               {!isEdit && (
                 <button
@@ -114,7 +104,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
                   onClick={fillExample}
                   className="text-[9px] text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                  Подставить пример
+                  {t('manualrule.fillExample')}
                 </button>
               )}
             </div>
@@ -122,36 +112,36 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder={EXAMPLES[category].description}
+              placeholder={t(exampleKey(category, 'Description'))}
               className="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
               maxLength={500}
             />
-            <p className="text-[9px] text-gray-600 mt-1">Что запрещено или требуется. 1 предложение.</p>
+            <p className="text-[9px] text-gray-600 mt-1">{t('manualrule.descriptionHint')}</p>
           </div>
 
           {/* Pattern description */}
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">
-              Паттерн (для LLM) <span className="text-red-400 normal-case">*</span>
+              {t('manualrule.patternLabel')} <span className="text-red-400 normal-case">*</span>
             </label>
             <textarea
               value={patternDescription}
               onChange={e => setPatternDescription(e.target.value)}
-              placeholder={EXAMPLES[category].pattern}
+              placeholder={t(exampleKey(category, 'Pattern'))}
               rows={4}
               className="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font resize-none"
               maxLength={2000}
             />
             <p className="text-[9px] text-gray-600 mt-1">
-              Детально опиши паттерн, который LLM должен искать. Используй конкретные имена функций, файлов или признаки.
+              {t('manualrule.patternHint')}
             </p>
           </div>
 
           {/* Enabled toggle */}
           <label className="flex items-center justify-between p-3 bg-[#0d1117] border border-[#30363d] rounded cursor-pointer">
             <div>
-              <p className="text-xs text-gray-200 font-semibold">Правило активно</p>
-              <p className="text-[10px] text-gray-500">Применяется при анализе кода</p>
+              <p className="text-xs text-gray-200 font-semibold">{t('manualrule.ruleActive')}</p>
+              <p className="text-[10px] text-gray-500">{t('manualrule.ruleActiveHint')}</p>
             </div>
             <Toggle checked={enabled} onChange={setEnabled} />
           </label>
@@ -168,7 +158,7 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
             onClick={onClose}
             className="flex-1 bg-[#30363d] hover:bg-[#484f58] text-gray-300 text-xs py-2 rounded transition-colors"
           >
-            Отмена
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -178,12 +168,12 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
             {loading ? (
               <>
                 <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                Сохранение...
+                {t('manualrule.saving')}
               </>
             ) : (
               <>
                 <FontAwesomeIcon icon={isEdit ? faPencil : faPlus} className="mr-2" />
-                {isEdit ? 'Сохранить изменения' : 'Создать правило'}
+                {isEdit ? t('manualrule.saveChanges') : t('manualrule.createRule')}
               </>
             )}
           </button>

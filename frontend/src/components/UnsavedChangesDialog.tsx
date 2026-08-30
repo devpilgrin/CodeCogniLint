@@ -4,6 +4,7 @@ import {
   faTriangleExclamation, faFloppyDisk, faTrash,
   faXmark, faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
+import { useI18n } from '../i18n';
 
 interface Props {
   fileName: string;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function UnsavedChangesDialog({ fileName, filePath, onSave, onDiscard, onCancel }: Props) {
+  const { t } = useI18n();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +42,10 @@ export function UnsavedChangesDialog({ fileName, filePath, onSave, onDiscard, on
             />
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-white mb-1">
-                Сохранить изменения?
+                {t('unsaved.title')}
               </h3>
               <p className="text-xs text-gray-300 leading-relaxed">
-                Файл <span className="text-blue-300 code-font">{fileName}</span> содержит
-                несохранённые изменения. Если закрыть без сохранения, они будут потеряны.
+                {t('unsaved.body1')} <span className="text-blue-300 code-font">{fileName}</span> {t('unsaved.body2')}
               </p>
               <p className="text-[10px] text-gray-500 mt-1 code-font truncate" title={filePath}>
                 {filePath}
@@ -65,7 +66,7 @@ export function UnsavedChangesDialog({ fileName, filePath, onSave, onDiscard, on
               className="flex-1 bg-[#30363d] hover:bg-[#484f58] disabled:opacity-50 text-gray-300 text-xs py-2 rounded transition-colors flex items-center justify-center"
             >
               <FontAwesomeIcon icon={faXmark} className="mr-1.5" />
-              Отмена
+              {t('common.cancel')}
             </button>
             <button
               onClick={onDiscard}
@@ -73,7 +74,7 @@ export function UnsavedChangesDialog({ fileName, filePath, onSave, onDiscard, on
               className="flex-1 bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 border border-red-500/30 text-red-300 text-xs py-2 rounded transition-colors flex items-center justify-center"
             >
               <FontAwesomeIcon icon={faTrash} className="mr-1.5" />
-              Не сохранять
+              {t('unsaved.discard')}
             </button>
             <button
               onClick={handleSave}
@@ -85,7 +86,7 @@ export function UnsavedChangesDialog({ fileName, filePath, onSave, onDiscard, on
               ) : (
                 <FontAwesomeIcon icon={faFloppyDisk} className="mr-1.5" />
               )}
-              Сохранить
+              {t('unsaved.save')}
             </button>
           </div>
         </div>

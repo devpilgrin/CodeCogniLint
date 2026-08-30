@@ -24,6 +24,7 @@ import { usePentest } from './hooks/usePentest';
 import { useAudit } from './hooks/useAudit';
 import { useQuality } from './hooks/useQuality';
 import type { OpenTab, Rule, RuleCategory, Violation } from './types';
+import { useI18n } from './i18n';
 
 type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
 
@@ -33,6 +34,7 @@ interface PendingRule {
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [activePanel, setActivePanel] = useState<SidebarPanel>('explorer');
   const [aiView, setAiView] = useState<AIView>('file');
   const [tabsCollapsed, setTabsCollapsed] = useState(false);
@@ -138,7 +140,7 @@ export default function App() {
   /** Save tab content to disk. Returns null on success or error message on failure. */
   const saveTab = useCallback(async (path: string): Promise<string | null> => {
     const tab = tabs.find(t => t.path === path);
-    if (!tab) return 'Файл не найден среди открытых табов';
+    if (!tab) return t('app.fileNotInTabs');
     const snapshot = tab.content;
     const err = await saveFile(path, snapshot);
     if (err) {
@@ -152,9 +154,9 @@ export default function App() {
         ? { ...t, originalContent: snapshot, dirty: t.content !== snapshot }
         : t
     ));
-    setSaveToast({ kind: 'ok', text: `Сохранено: ${tab.name}` });
+    setSaveToast({ kind: 'ok', text: t('app.saved', { name: tab.name }) });
     return null;
-  }, [tabs, saveFile]);
+  }, [tabs, saveFile, t]);
 
   const closeFile = useCallback((path: string) => {
     const tab = tabs.find(t => t.path === path);
@@ -208,7 +210,7 @@ export default function App() {
     if (dirty.length === 0) return true;
     const list = dirty.map(t => '• ' + t.path).join('\n');
     return window.confirm(
-      `Несохранённые изменения в ${dirty.length} файлах:\n\n${list}\n\nПродолжить? Изменения будут потеряны.`
+      t('app.confirmCloseDirty', { count: dirty.length, list })
     );
   }, [tabs]);
 
@@ -346,51 +348,51 @@ export default function App() {
     switch (aiView) {
       case 'file': {
         if (!activeTab) {
-          setSaveToast({ kind: 'err', text: 'Нет активного файла' });
+          setSaveToast({ kind: 'err', text: t('app.noActiveFile') });
           return;
         }
         if (!(activeTab.path in resultsByFile)) {
-          setSaveToast({ kind: 'err', text: 'Нет данных для сброса' });
+          setSaveToast({ kind: 'err', text: t('app.noDataToReset') });
           return;
         }
         clearFileResult(activeTab.path);
-        setSaveToast({ kind: 'ok', text: `Результаты для ${activeTab.name} сброшены` });
+        setSaveToast({ kind: 'ok', text: t('app.resultsReset', { name: activeTab.name }) });
         break;
       }
       case 'repository': {
         const count = Object.keys(resultsByFile).length;
         if (count === 0) {
-          setSaveToast({ kind: 'err', text: 'Нет результатов для сброса' });
+          setSaveToast({ kind: 'err', text: t('app.noResultsToReset') });
           return;
         }
-        if (window.confirm(`Удалить результаты анализа всех ${count} файлов?`)) {
+        if (window.confirm(t('app.confirmClearAll', { count }))) {
           clearAllResults();
-          setSaveToast({ kind: 'ok', text: 'Все результаты анализа сброшены' });
+          setSaveToast({ kind: 'ok', text: t('app.allResultsReset') });
         }
         break;
       }
       case 'chat': {
         if (messages.length <= 1) {
-          setSaveToast({ kind: 'err', text: 'История уже пустая' });
+          setSaveToast({ kind: 'err', text: t('app.chatHistoryEmpty') });
           return;
         }
-        if (window.confirm('Очистить историю чата?')) {
+        if (window.confirm(t('app.confirmClearChat'))) {
           clearMessages();
         }
         break;
       }
       case 'review': {
         if (!reviewState.file && !reviewState.changes) {
-          setSaveToast({ kind: 'err', text: 'Нет результатов ревью для сброса' });
+          setSaveToast({ kind: 'err', text: t('app.noReviewToReset') });
           return;
         }
         clearReview();
-        setSaveToast({ kind: 'ok', text: 'Результаты ревью сброшены' });
+        setSaveToast({ kind: 'ok', text: t('app.reviewReset') });
         break;
       }
       case 'commit':
       case 'pr':
-        setSaveToast({ kind: 'err', text: 'Режим в разработке — нечего сбрасывать' });
+        setSaveToast({ kind: 'err', text: t('app.modeInDev') });
         break;
     }
   }, [aiView, activeTab, resultsByFile, messages, reviewState, clearFileResult, clearAllResults, clearMessages, clearReview]);
@@ -502,8 +504,8 @@ export default function App() {
           className="absolute bottom-24 right-[336px] bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full p-3 shadow-2xl transition-all z-10 flex items-center justify-center"
           title={
             Object.keys(resultsByFile).length === 0
-              ? 'Сначала запустите анализ файла или проекта'
-              : `Сводный отчёт (${Object.keys(resultsByFile).length} файлов)`
+              ? t('app.reportNeedAnalysis')
+              : t('app.reportButtonTitle', { count: Object.keys(resultsByFile).length })
           }
         >
           <FontAwesomeIcon icon={faChartBar} className="text-lg" />
@@ -528,7 +530,7 @@ export default function App() {
         onClick={handleAnalyzeFile}
         disabled={analyzing || !activeTab}
         className="fixed bottom-10 right-[336px] bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full p-4 shadow-2xl pulse-ring transition-all z-10"
-        title={activeTab ? `Анализировать текущий файл: ${activeTab.name}` : 'Откройте файл для анализа'}
+        title={activeTab ? t('app.analyzeFileTitle', { name: activeTab.name }) : t('app.analyzeOpenFileFirst')}
       >
         <FontAwesomeIcon icon={faWandMagicSparkles} className="text-xl" />
       </button>

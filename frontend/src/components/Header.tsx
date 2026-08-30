@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMicrochip, faCodeBranch, faPlay, faFolderOpen } from '@fortawesome/free-solid-svg-icons';
 import type { WorkspaceInfo } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   contextHealth: number;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function Header({ contextHealth, workspace, onAnalyzeProject, analyzing }: Props) {
+  const { t } = useI18n();
   const disabled = analyzing || !workspace;
   return (
     <header className="h-12 border-b border-[#30363d] flex items-center justify-between px-4 bg-[#161b22] z-50 flex-shrink-0">
@@ -29,7 +31,7 @@ export function Header({ contextHealth, workspace, onAnalyzeProject, analyzing }
               <span>main</span>
             </>
           ) : (
-            <span className="italic text-gray-500">проект не открыт</span>
+            <span className="italic text-gray-500">{t('header.noProject')}</span>
           )}
         </div>
       </div>
@@ -51,15 +53,15 @@ export function Header({ contextHealth, workspace, onAnalyzeProject, analyzing }
           disabled={disabled}
           title={
             !workspace
-              ? 'Сначала откройте проект'
+              ? t('header.openProjectFirst')
               : analyzing
-              ? 'Анализ выполняется...'
-              : 'Просканировать все кодовые файлы проекта'
+              ? t('header.analyzing')
+              : t('header.analyzeTooltip')
           }
           className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs px-3 py-1 rounded transition-colors flex items-center"
         >
           <FontAwesomeIcon icon={faPlay} className="mr-2 text-[10px]" />
-          Анализ проекта
+          {t('header.analyzeProject')}
         </button>
 
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white border border-white/20 cursor-pointer select-none">

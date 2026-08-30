@@ -6,6 +6,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { faJsSquare, faReact, faPython, faHtml5, faCss3, faMarkdown } from '@fortawesome/free-brands-svg-icons';
 import type { TreeNode } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   root: TreeNode;
@@ -94,6 +95,7 @@ function TreeItem({ node, level, expanded, onToggle, activeFile, resultsByFile, 
 }
 
 export function FileTree(props: Props) {
+  const { t } = useI18n();
   const { root } = props;
   // Expand root level dirs by default
   const initialExpanded = new Set<string>();
@@ -119,7 +121,7 @@ export function FileTree(props: Props) {
     <div className="select-none">
       {root.truncated && (
         <div className="px-2 py-1 mx-2 my-1 bg-yellow-500/10 border border-yellow-500/30 rounded text-[10px] text-yellow-400">
-          ⚠️ Дерево обрезано: слишком много файлов
+          {t('filetree.truncated')}
         </div>
       )}
       {root.children?.map(child => (

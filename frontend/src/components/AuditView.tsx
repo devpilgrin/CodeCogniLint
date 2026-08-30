@@ -4,6 +4,7 @@ import {
   faUserTie, faSpinner, faTriangleExclamation, faFolderOpen,
 } from '@fortawesome/free-solid-svg-icons';
 import type { AuditReport, Exploitability } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   hasWorkspace: boolean;
@@ -23,28 +24,29 @@ const riskStyle: Record<string, string> = {
   unknown: 'bg-gray-500/15 border-gray-500/40 text-gray-400',
 };
 
-const riskLabel: Record<string, string> = {
-  low: 'НИЗКИЙ', medium: 'СРЕДНИЙ', high: 'ВЫСОКИЙ', critical: 'КРИТИЧЕСКИЙ', unknown: 'Н/Д',
-};
-
-const explLabel: Record<Exploitability, string> = {
-  high: 'выс.', medium: 'сред.', low: 'низк.', unknown: '?',
-};
-
 const explColor: Record<Exploitability, string> = {
   high: 'text-red-400', medium: 'text-yellow-400', low: 'text-green-400', unknown: 'text-gray-500',
 };
 
-const sevLabel: Record<string, string> = { critical: 'CRIT', warning: 'WARN', info: 'INFO' };
-
 export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenFile, onExportHtml }: Props) {
+  const { t } = useI18n();
   const [verify, setVerify] = useState(false);
+
+  const riskLabel: Record<string, string> = {
+    low: t('risk.low'), medium: t('risk.medium'), high: t('risk.high'), critical: t('risk.critical'), unknown: t('risk.unknown'),
+  };
+
+  const explLabel: Record<Exploitability, string> = {
+    high: t('audit.expl.high'), medium: t('audit.expl.medium'), low: t('audit.expl.low'), unknown: t('audit.expl.unknown'),
+  };
+
+  const sevLabel: Record<string, string> = { critical: t('audit.sev.critical'), warning: t('audit.sev.warning'), info: t('audit.sev.info') };
 
   if (!hasWorkspace) {
     return (
       <div className="p-4 text-center">
         <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-        <p className="text-xs text-gray-500">Откройте проект для аудита</p>
+        <p className="text-xs text-gray-500">{t('audit.openProject')}</p>
       </div>
     );
   }
@@ -60,19 +62,19 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
           {running
             ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1.5" />
             : <FontAwesomeIcon icon={faUserTie} className="mr-1.5" />}
-          {running ? 'Аудит: суб-агенты работают...' : 'Запустить мульти-агентный аудит'}
+          {running ? t('audit.running') : t('audit.run')}
         </button>
         <label className="flex items-center text-[10px] text-gray-500 cursor-pointer select-none">
           <input type="checkbox" checked={verify} onChange={e => setVerify(e.target.checked)} className="mr-1.5 accent-red-500" />
-          Предварительная LLM-верификация находок
+          {t('audit.verify')}
         </label>
         {report && (
           <button
             onClick={onExportHtml}
             className="w-full text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-blue-500/50 hover:text-blue-300 transition-colors"
-            title="Скачать отчёт аудита в HTML"
+            title={t('audit.exportTitle')}
           >
-            Экспорт отчёта (HTML)
+            {t('audit.export')}
           </button>
         )}
       </div>
@@ -95,12 +97,12 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
             {report.synthesis && (
               <div className="px-3 py-2 space-y-1.5 border-b border-[#30363d]">
                 <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${riskStyle[report.synthesis.overall_risk]}`}>
-                  ИТОГ: {riskLabel[report.synthesis.overall_risk]} РИСК
+                  {t('audit.overallRisk', { risk: riskLabel[report.synthesis.overall_risk] })}
                 </div>
                 <p className="text-[11px] text-gray-300 leading-relaxed">{report.synthesis.verdict}</p>
                 {report.synthesis.attack_vectors.length > 0 && (
                   <div className="space-y-0.5">
-                    <p className="text-[9px] uppercase font-bold text-gray-500">Векторы атаки</p>
+                    <p className="text-[9px] uppercase font-bold text-gray-500">{t('audit.attackVectors')}</p>
                     {report.synthesis.attack_vectors.map((v, i) => (
                       <p key={i} className="text-[10px] text-orange-300/80 leading-snug">⚔ {v}</p>
                     ))}
@@ -108,7 +110,7 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
                 )}
                 {report.synthesis.priorities.length > 0 && (
                   <div className="space-y-0.5">
-                    <p className="text-[9px] uppercase font-bold text-gray-500">Приоритеты</p>
+                    <p className="text-[9px] uppercase font-bold text-gray-500">{t('audit.priorities')}</p>
                     {report.synthesis.priorities.map((p, i) => (
                       <p key={i} className="text-[10px] text-gray-400 leading-snug">{i + 1}. {p}</p>
                     ))}
@@ -120,14 +122,14 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
             {/* Матрица рисков */}
             {report.matrix.length > 0 && (
               <div className="px-3 py-2 border-b border-[#30363d]">
-                <p className="text-[9px] uppercase font-bold text-gray-500 mb-1.5">Матрица рисков (CWE)</p>
+                <p className="text-[9px] uppercase font-bold text-gray-500 mb-1.5">{t('audit.matrix')}</p>
                 <table className="w-full text-[9px] code-font">
                   <thead>
                     <tr className="text-gray-600 text-left">
                       <th className="pb-1">CWE</th>
-                      <th className="pb-1 text-center">Кол-во</th>
-                      <th className="pb-1 text-center">Тяжесть</th>
-                      <th className="pb-1 text-center">Эксплуат.</th>
+                      <th className="pb-1 text-center">{t('audit.colCount')}</th>
+                      <th className="pb-1 text-center">{t('audit.colSeverity')}</th>
+                      <th className="pb-1 text-center">{t('audit.colExploit')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,7 +160,7 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
                   </span>
                 </div>
                 {d.agent_error ? (
-                  <p className="text-[10px] text-gray-600 italic">Суб-агент недоступен: {d.agent_error}</p>
+                  <p className="text-[10px] text-gray-600 italic">{t('audit.agentUnavailable', { error: d.agent_error })}</p>
                 ) : (
                   <>
                     <p className="text-[10px] text-gray-400 leading-relaxed">{d.assessment}</p>
@@ -167,7 +169,7 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
                         key={i}
                         onClick={() => f.file && onOpenFile(f.file)}
                         className={`w-full text-left text-[10px] leading-snug px-2 py-1 rounded bg-[#161b22] border border-[#30363d] hover:border-blue-500/40 transition-colors ${f.real ? '' : 'opacity-50'}`}
-                        title={f.real ? 'Открыть файл' : 'Суб-агент считает ложным срабатыванием'}
+                        title={f.real ? t('audit.openFile') : t('audit.falsePositive')}
                       >
                         <span className="text-gray-500 code-font">{f.rule}</span>
                         <span className={`ml-1.5 ${explColor[f.exploitability]}`}>[{explLabel[f.exploitability]}]</span>
@@ -193,10 +195,10 @@ export function AuditView({ hasWorkspace, report, running, error, onRun, onOpenF
           <div className="p-6 text-center">
             <FontAwesomeIcon icon={faUserTie} className="text-3xl text-gray-600 mb-2" />
             <p className="text-[11px] text-gray-500 leading-relaxed">
-              Мульти-агентный аудит: детерминированный скан,<br />
-              затем суб-агенты по доменам (инъекции, секреты,<br />
-              криптография, конфигурация, зависимости)<br />
-              и синтезатор с итоговым вердиктом.
+              {t('audit.emptyLine1')}<br />
+              {t('audit.emptyLine2')}<br />
+              {t('audit.emptyLine3')}<br />
+              {t('audit.emptyLine4')}
             </p>
           </div>
         )}

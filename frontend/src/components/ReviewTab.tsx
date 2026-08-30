@@ -5,6 +5,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { ReviewResult, ReviewIssue, ReviewVerdict } from '../types';
 import type { ReviewMode, ReviewState } from '../hooks/useReview';
+import { useI18n } from '../i18n';
 
 interface Props {
   reviewing: ReviewMode | null;
@@ -24,38 +25,19 @@ const verdictStyle: Record<ReviewVerdict, string> = {
   request_changes: 'bg-red-500/15 border-red-500/40 text-red-400',
 };
 
-const verdictLabel: Record<ReviewVerdict, string> = {
-  approve: '✓ ОДОБРЕНО',
-  comment: '💬 ЕСТЬ КОММЕНТАРИИ',
-  request_changes: '✗ ТРЕБУЮТСЯ ПРАВКИ',
-};
-
 const severityBadge: Record<ReviewIssue['severity'], string> = {
   critical: 'text-orange-400 bg-orange-400/10',
   warning: 'text-yellow-400 bg-yellow-400/10',
   info: 'text-blue-400 bg-blue-400/10',
 };
 
-const severityLabel: Record<ReviewIssue['severity'], string> = {
-  critical: 'КРИТИЧНО',
-  warning: 'ВАЖНО',
-  info: 'ИНФО',
-};
-
-const categoryLabel: Record<ReviewIssue['category'], string> = {
-  bug: 'БАГ',
-  security: 'БЕЗОПАСНОСТЬ',
-  performance: 'ПРОИЗВОДИТ.',
-  style: 'СТИЛЬ',
-  maintainability: 'ПОДДЕРЖИВ.',
-};
-
-function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile }: {
+function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile, t }: {
   issue: ReviewIssue;
   filePath: string;
   activeFilePath: string | null;
   onJumpToLine: (line: number) => void;
   onOpenFile: (path: string) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const handleJump = () => {
     if (filePath === activeFilePath) {
@@ -68,19 +50,19 @@ function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile }
     <div
       className="border border-[#30363d] rounded-lg p-3 space-y-2 cursor-pointer bg-[#0d1117] hover:border-blue-500/40 transition-colors"
       onClick={handleJump}
-      title={filePath === activeFilePath ? 'Перейти к строке' : `Открыть ${filePath}`}
+      title={filePath === activeFilePath ? t('review.jumpToLine') : t('review.openFile', { path: filePath })}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-1">
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${severityBadge[issue.severity]}`}>
-            {severityLabel[issue.severity]}
+            {t(`sev.${issue.severity}`)}
           </span>
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-gray-400 bg-gray-400/10">
-            {categoryLabel[issue.category]}
+            {t(`reviewcat.${issue.category}`)}
           </span>
         </div>
         <span className="text-[10px] text-gray-500 flex items-center">
-          стр. {issue.line_start}{issue.line_end !== issue.line_start ? `–${issue.line_end}` : ''}
+          {t('review.line', { line: issue.line_start })}{issue.line_end !== issue.line_start ? `–${issue.line_end}` : ''}
           <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[8px]" />
         </span>
       </div>
@@ -101,12 +83,13 @@ function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile }
   );
 }
 
-function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, showPath }: {
+function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, showPath, t }: {
   review: ReviewResult;
   activeFilePath: string | null;
   onJumpToLine: (line: number) => void;
   onOpenFile: (path: string) => void;
   showPath: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   return (
     <div className="space-y-2">
@@ -114,14 +97,14 @@ function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, sho
         <button
           onClick={() => onOpenFile(review.file_path)}
           className="w-full text-left text-[10px] text-blue-400 hover:text-blue-300 code-font truncate"
-          title={`Открыть ${review.file_path}`}
+          title={t('review.openFile', { path: review.file_path })}
         >
           <FontAwesomeIcon icon={faFileCode} className="mr-1" />
           {review.file_path}
         </button>
       )}
       <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${verdictStyle[review.verdict]}`}>
-        {verdictLabel[review.verdict]}
+        {t(`verdict.${review.verdict}`)}
       </div>
       {review.summary && (
         <p className="text-[11px] text-gray-400 leading-relaxed px-1">{review.summary}</p>
@@ -134,12 +117,13 @@ function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, sho
           activeFilePath={activeFilePath}
           onJumpToLine={onJumpToLine}
           onOpenFile={onOpenFile}
+          t={t}
         />
       ))}
       {review.positives.length > 0 && (
         <div className="border border-green-500/20 bg-green-500/5 rounded-lg p-2.5 space-y-1">
           <div className="text-[9px] font-bold text-green-400 uppercase flex items-center">
-            <FontAwesomeIcon icon={faThumbsUp} className="mr-1" /> Сильные стороны
+            <FontAwesomeIcon icon={faThumbsUp} className="mr-1" /> {t('review.strengths')}
           </div>
           {review.positives.map((p, i) => (
             <p key={i} className="text-[10px] text-gray-400 leading-relaxed">· {p}</p>
@@ -154,6 +138,7 @@ export function ReviewTab({
   reviewing, state, error, activeFilePath, hasWorkspace,
   onReviewFile, onReviewChanges, onJumpToLine, onOpenFile,
 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Actions */}
@@ -162,23 +147,23 @@ export function ReviewTab({
           onClick={onReviewFile}
           disabled={reviewing !== null || !activeFilePath}
           className="w-full text-xs py-1.5 rounded transition-colors border bg-blue-600/20 hover:bg-blue-600/40 border-blue-500/30 text-blue-400 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-          title={activeFilePath ? `Ревью файла: ${activeFilePath}` : 'Откройте файл для ревью'}
+          title={activeFilePath ? t('review.reviewFileTooltip', { path: activeFilePath }) : t('review.openFileFirst')}
         >
           {reviewing === 'file'
             ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1.5" />
             : <FontAwesomeIcon icon={faFileCode} className="mr-1.5" />}
-          {reviewing === 'file' ? 'Ревью файла...' : 'Ревью текущего файла'}
+          {reviewing === 'file' ? t('review.reviewingFile') : t('review.reviewFile')}
         </button>
         <button
           onClick={onReviewChanges}
           disabled={reviewing !== null || !hasWorkspace}
           className="w-full text-xs py-1.5 rounded transition-colors border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-400 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-          title="Ревью незакоммиченных изменений (git)"
+          title={t('review.reviewChangesTooltip')}
         >
           {reviewing === 'changes'
             ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1.5" />
             : <FontAwesomeIcon icon={faCodeBranch} className="mr-1.5" />}
-          {reviewing === 'changes' ? 'Ревью изменений...' : 'Ревью изменений (git)'}
+          {reviewing === 'changes' ? t('review.reviewingChanges') : t('review.reviewChanges')}
         </button>
       </div>
 
@@ -198,13 +183,14 @@ export function ReviewTab({
             onJumpToLine={onJumpToLine}
             onOpenFile={onOpenFile}
             showPath
+            t={t}
           />
         )}
 
         {!error && state.mode === 'changes' && state.changes && (
           <div className="space-y-3">
             <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${verdictStyle[state.changes.overall_verdict]}`}>
-              {verdictLabel[state.changes.overall_verdict]}
+              {t(`verdict.${state.changes.overall_verdict}`)}
             </div>
             <p className="text-[11px] text-gray-400 leading-relaxed px-1">{state.changes.summary}</p>
             {state.changes.files.map((review, i) => (
@@ -215,6 +201,7 @@ export function ReviewTab({
                   onJumpToLine={onJumpToLine}
                   onOpenFile={onOpenFile}
                   showPath
+                  t={t}
                 />
               </div>
             ))}
@@ -225,11 +212,11 @@ export function ReviewTab({
           <div className="flex-1 flex items-center justify-center p-6 text-center h-full">
             <div>
               <FontAwesomeIcon icon={faClipboardCheck} className="text-3xl text-gray-600 mb-2" />
-              <p className="text-xs text-gray-400 font-semibold mb-1">Агент код-ревью</p>
+              <p className="text-xs text-gray-400 font-semibold mb-1">{t('review.agentTitle')}</p>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                Ревью текущего файла или незакоммиченных<br />
-                изменений: вердикт, замечания с привязкой<br />
-                к строкам и сильные стороны кода.
+                {t('review.agentHint1')}<br />
+                {t('review.agentHint2')}<br />
+                {t('review.agentHint3')}
               </p>
             </div>
           </div>

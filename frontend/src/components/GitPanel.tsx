@@ -7,6 +7,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { WorkspaceInfo, GitChangedFile, PrResult } from '../types';
 import { useGit } from '../hooks/useGit';
+import { useI18n } from '../i18n';
 
 interface Props {
   workspace: WorkspaceInfo | null;
@@ -21,15 +22,8 @@ const statusStyle: Record<GitChangedFile['status'], string> = {
   '?': 'text-blue-400',
 };
 
-const statusTitle: Record<GitChangedFile['status'], string> = {
-  M: 'Изменён',
-  A: 'Добавлен',
-  D: 'Удалён',
-  R: 'Переименован',
-  '?': 'Новый (untracked)',
-};
-
 export function GitPanel({ workspace, onFileOpen }: Props) {
+  const { t } = useI18n();
   const { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr } =
     useGit(workspace?.path ?? null);
   const [message, setMessage] = useState('');
@@ -39,6 +33,14 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
   const [prBase, setPrBase] = useState('main');
   const [prLlm, setPrLlm] = useState(true);
   const [prResult, setPrResult] = useState<PrResult | null>(null);
+
+  const statusTitle: Record<GitChangedFile['status'], string> = {
+    M: t('git.statusModified'),
+    A: t('git.statusAdded'),
+    D: t('git.statusDeleted'),
+    R: t('git.statusRenamed'),
+    '?': t('git.statusUntracked'),
+  };
 
   const handleCommit = async () => {
     const ok = await doCommit(message);
@@ -58,7 +60,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
           onClick={refresh}
           disabled={!workspace || busy !== null}
           className="text-gray-400 hover:text-white transition-colors disabled:opacity-40"
-          title="Обновить статус"
+          title={t('git.refresh')}
         >
           <FontAwesomeIcon icon={faRotate} spin={busy === 'refresh'} />
         </button>
@@ -67,14 +69,14 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
       {!workspace && (
         <div className="p-4 text-center">
           <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-          <p className="text-xs text-gray-500">Откройте проект,<br />чтобы работать с Git</p>
+          <p className="text-xs text-gray-500">{t('git.openProjectHint1')}<br />{t('git.openProjectHint2')}</p>
         </div>
       )}
 
       {workspace && notRepo && (
         <div className="mx-2 mt-2 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-[10px] text-yellow-400 flex items-start">
           <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1.5 mt-0.5 flex-shrink-0" />
-          <span>Текущий проект не является git-репозиторием. Клонируйте репозиторий или откройте папку с git.</span>
+          <span>{t('git.notRepo')}</span>
         </div>
       )}
 
@@ -84,22 +86,22 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
           <div className="px-3 py-2 bg-[#161b22] border-b border-[#30363d]">
             <div className="flex items-center text-xs text-gray-200">
               <FontAwesomeIcon icon={faCodeBranch} className="mr-1.5 text-gray-500" />
-              <span className="font-semibold code-font">{status.branch ?? 'detached HEAD'}</span>
+              <span className="font-semibold code-font">{status.branch ?? t('git.detachedHead')}</span>
               <span className="ml-2 text-[10px] text-gray-500 code-font">{status.head}</span>
             </div>
             <div className="flex items-center space-x-2 mt-1 text-[10px]">
               {status.tracking ? (
                 <span className="text-gray-500 code-font truncate" title={status.tracking}>→ {status.tracking}</span>
               ) : (
-                <span className="text-gray-500">upstream не задан</span>
+                <span className="text-gray-500">{t('git.noUpstream')}</span>
               )}
               {status.ahead > 0 && (
-                <span className="text-green-400 flex items-center" title="Коммитов впереди remote">
+                <span className="text-green-400 flex items-center" title={t('git.aheadTitle')}>
                   <FontAwesomeIcon icon={faArrowUp} className="mr-0.5" />{status.ahead}
                 </span>
               )}
               {status.behind > 0 && (
-                <span className="text-orange-400 flex items-center" title="Коммитов позади remote">
+                <span className="text-orange-400 flex items-center" title={t('git.behindTitle')}>
                   <FontAwesomeIcon icon={faArrowDown} className="mr-0.5" />{status.behind}
                 </span>
               )}
@@ -126,7 +128,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
               title="git pull --ff-only"
             >
               <FontAwesomeIcon icon={faCloudArrowDown} className="mr-1" spin={busy === 'pull'} />
-              {busy === 'pull' ? 'Pull...' : 'Pull'}
+              {busy === 'pull' ? t('git.pulling') : t('git.pull')}
             </button>
             <button
               onClick={doPush}
@@ -135,7 +137,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
               title="git push"
             >
               <FontAwesomeIcon icon={faCloudArrowUp} className="mr-1" spin={busy === 'push'} />
-              {busy === 'push' ? 'Push...' : `Push${status.ahead > 0 ? ` (${status.ahead})` : ''}`}
+              {busy === 'push' ? t('git.pushing') : `${t('git.push')}${status.ahead > 0 ? ` (${status.ahead})` : ''}`}
             </button>
           </div>
 
@@ -144,7 +146,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="Сообщение коммита..."
+              placeholder={t('git.commitPlaceholder')}
               rows={3}
               className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 resize-none"
             />
@@ -152,9 +154,9 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
               onClick={handleCommit}
               disabled={busy !== null || !message.trim() || status.clean}
               className="w-full mt-1.5 text-xs py-1.5 rounded transition-colors border bg-blue-600/20 hover:bg-blue-600/40 border-blue-500/30 text-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"
-              title={status.clean ? 'Нет изменений для коммита' : `Закоммитить ${status.changed.length} файлов`}
+              title={status.clean ? t('git.noChangesToCommit') : t('git.commitFilesTitle', { count: status.changed.length })}
             >
-              {busy === 'commit' ? 'Коммит...' : `Коммит (${status.changed.length})`}
+              {busy === 'commit' ? t('git.committing') : t('git.commit', { count: status.changed.length })}
             </button>
           </div>
 
@@ -163,7 +165,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
             <button
               onClick={() => setPrOpen(o => !o)}
               className="w-full text-[10px] py-1.5 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-purple-500/50 hover:text-purple-300 transition-colors flex items-center justify-center"
-              title="Создать Pull Request на GitHub (push + API)"
+              title={t('git.prToggleTitle')}
             >
               <FontAwesomeIcon icon={faCodePullRequest} className="mr-1" />
               PR / MR {prOpen ? '▴' : '▾'}
@@ -173,13 +175,13 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
                 <input
                   value={prTitle}
                   onChange={e => setPrTitle(e.target.value)}
-                  placeholder="Заголовок PR (пусто = LLM/коммит)"
+                  placeholder={t('git.prTitlePlaceholder')}
                   className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500"
                 />
                 <textarea
                   value={prBody}
                   onChange={e => setPrBody(e.target.value)}
-                  placeholder="Описание (пусто = LLM)"
+                  placeholder={t('git.prBodyPlaceholder')}
                   rows={2}
                   className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500 resize-none"
                 />
@@ -198,14 +200,14 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
                     onChange={e => setPrLlm(e.target.checked)}
                     className="mr-1.5 accent-purple-500"
                   />
-                  Сгенерировать заголовок/описание LLM
+                  {t('git.prGenerateLlm')}
                 </label>
                 <button
                   onClick={handlePr}
                   disabled={busy !== null || (!prLlm && !prTitle.trim())}
                   className="w-full text-[11px] py-1.5 rounded border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-300 transition-colors disabled:opacity-40"
                 >
-                  {busy === 'pr' ? 'Создание...' : 'Создать PR/MR (push + API)'}
+                  {busy === 'pr' ? t('git.prCreating') : t('git.prCreate')}
                 </button>
                 {prResult && (
                   <a
@@ -226,10 +228,10 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
           {/* Changed files */}
           <div className="mt-3">
             <div className="px-3 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
-              Изменения {status.changed.length > 0 && `(${status.changed.length})`}
+              {t('git.changes')} {status.changed.length > 0 && `(${status.changed.length})`}
             </div>
             {status.clean && (
-              <p className="px-3 mt-1 text-[11px] text-gray-500">Рабочее дерево чистое</p>
+              <p className="px-3 mt-1 text-[11px] text-gray-500">{t('git.cleanTree')}</p>
             )}
             <div className="mt-1">
               {status.changed.map(f => (
@@ -237,7 +239,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
                   key={`${f.path}-${f.staged}`}
                   onClick={() => onFileOpen(f.path)}
                   className="w-full text-left px-3 py-1 text-[11px] text-gray-400 hover:text-blue-300 hover:bg-[#161b22] flex items-center transition-colors"
-                  title={`${f.path} — ${statusTitle[f.status]}${f.staged ? ' (staged)' : ''}`}
+                  title={`${f.path} — ${statusTitle[f.status]}${f.staged ? t('git.stagedSuffix') : ''}`}
                 >
                   <span className={`w-4 font-bold code-font flex-shrink-0 ${statusStyle[f.status]}`}>
                     {f.status}
@@ -252,7 +254,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
           {commits.length > 0 && (
             <div className="mt-3 border-t border-[#30363d]">
               <div className="px-3 pt-2 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
-                История
+                {t('git.history')}
               </div>
               {commits.map(c => (
                 <div key={c.hash} className="px-3 py-1.5 border-b border-[#21262d]">
@@ -271,7 +273,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
       )}
 
       {workspace && !status && !notRepo && (
-        <p className="text-xs text-gray-500 text-center py-4">Загрузка статуса...</p>
+        <p className="text-xs text-gray-500 text-center py-4">{t('git.loadingStatus')}</p>
       )}
     </aside>
   );

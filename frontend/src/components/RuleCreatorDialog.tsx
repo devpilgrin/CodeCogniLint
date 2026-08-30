@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import type { RuleCategory } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   selectedCode: string;
@@ -12,11 +13,10 @@ interface Props {
   error?: string | null;
 }
 
-const CATEGORIES: { value: RuleCategory; label: string; desc: string }[] = [
-  { value: 'syntax',   label: 'Синтаксис', desc: 'Оформление, именование, структура' },
-  { value: 'semantic', label: 'Семантика',  desc: 'Логика, смысл, поведение' },
-  { value: 'analysis', label: 'Анализ',     desc: 'Безопасность, техдолг, история Git' },
-];
+const CATEGORIES: RuleCategory[] = ['syntax', 'semantic', 'analysis'];
+
+const categoryKey = (cat: RuleCategory, suffix: string) =>
+  'rules.category' + cat.charAt(0).toUpperCase() + cat.slice(1) + suffix;
 
 const borderColor: Record<RuleCategory, string> = {
   syntax:   'border-blue-500 bg-blue-500/10',
@@ -25,6 +25,7 @@ const borderColor: Record<RuleCategory, string> = {
 };
 
 export function RuleCreatorDialog({ selectedCode, initialCategory, onConfirm, onClose, loading, error }: Props) {
+  const { t } = useI18n();
   const [category, setCategory] = useState<RuleCategory>(initialCategory);
 
   const handleConfirm = async () => {
@@ -38,7 +39,7 @@ export function RuleCreatorDialog({ selectedCode, initialCategory, onConfirm, on
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-white flex items-center">
             <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2 text-blue-400" />
-            Создать правило из кода (LLM)
+            {t('rulecreator.title')}
           </h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <FontAwesomeIcon icon={faTimes} />
@@ -50,26 +51,26 @@ export function RuleCreatorDialog({ selectedCode, initialCategory, onConfirm, on
         </div>
 
         <div className="mb-4">
-          <p className="text-[11px] text-gray-500 uppercase font-semibold mb-2">Категория правила</p>
+          <p className="text-[11px] text-gray-500 uppercase font-semibold mb-2">{t('rulecreator.categoryLabel')}</p>
           <div className="space-y-2">
-            {CATEGORIES.map(cat => (
+            {CATEGORIES.map(catValue => (
               <label
-                key={cat.value}
+                key={catValue}
                 className={`flex items-start space-x-3 p-2 rounded border cursor-pointer transition-colors ${
-                  category === cat.value ? borderColor[cat.value] : 'border-[#30363d] hover:border-gray-500'
+                  category === catValue ? borderColor[catValue] : 'border-[#30363d] hover:border-gray-500'
                 }`}
               >
                 <input
                   type="radio"
                   name="category"
-                  value={cat.value}
-                  checked={category === cat.value}
-                  onChange={() => setCategory(cat.value)}
+                  value={catValue}
+                  checked={category === catValue}
+                  onChange={() => setCategory(catValue)}
                   className="mt-0.5"
                 />
                 <div>
-                  <p className="text-xs text-gray-200 font-semibold">{cat.label}</p>
-                  <p className="text-[10px] text-gray-500">{cat.desc}</p>
+                  <p className="text-xs text-gray-200 font-semibold">{t(categoryKey(catValue, ''))}</p>
+                  <p className="text-[10px] text-gray-500">{t(categoryKey(catValue, 'Desc'))}</p>
                 </div>
               </label>
             ))}
@@ -87,7 +88,7 @@ export function RuleCreatorDialog({ selectedCode, initialCategory, onConfirm, on
             onClick={onClose}
             className="flex-1 bg-[#30363d] hover:bg-[#484f58] text-gray-300 text-xs py-2 rounded transition-colors"
           >
-            Отмена
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
@@ -97,12 +98,12 @@ export function RuleCreatorDialog({ selectedCode, initialCategory, onConfirm, on
             {loading ? (
               <>
                 <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                LLM генерирует...
+                {t('rulecreator.generating')}
               </>
             ) : (
               <>
                 <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
-                Создать правило
+                {t('rulecreator.createRule')}
               </>
             )}
           </button>

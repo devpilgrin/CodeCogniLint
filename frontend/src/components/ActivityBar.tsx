@@ -3,6 +3,7 @@ import {
   faFileCode, faSearch, faCodeMerge,
   faCog, faList, faShieldHalved, faGaugeHigh,
 } from '@fortawesome/free-solid-svg-icons';
+import { useI18n } from '../i18n';
 
 type Panel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'security' | 'quality';
 
@@ -11,17 +12,18 @@ interface Props {
   onSelect: (panel: Panel) => void;
 }
 
-const items: { panel: Panel; icon: typeof faFileCode; label: string }[] = [
-  { panel: 'explorer', icon: faFileCode, label: 'Проводник' },
-  { panel: 'search', icon: faSearch, label: 'Поиск' },
-  { panel: 'git', icon: faCodeMerge, label: 'Git' },
-  { panel: 'security', icon: faShieldHalved, label: 'Безопасность' },
-  { panel: 'quality', icon: faGaugeHigh, label: 'Качество' },
-  { panel: 'rules', icon: faList, label: 'Правила' },
-  { panel: 'settings', icon: faCog, label: 'Настройки' },
-];
-
 export function ActivityBar({ activePanel, onSelect }: Props) {
+  const { t } = useI18n();
+  const items: { panel: Panel; icon: typeof faFileCode; label: string }[] = [
+    { panel: 'explorer', icon: faFileCode, label: t('panel.explorer') },
+    { panel: 'search', icon: faSearch, label: t('panel.search') },
+    { panel: 'git', icon: faCodeMerge, label: t('panel.git') },
+    { panel: 'security', icon: faShieldHalved, label: t('panel.security') },
+    { panel: 'quality', icon: faGaugeHigh, label: t('panel.quality') },
+    { panel: 'rules', icon: faList, label: t('panel.rules') },
+    { panel: 'settings', icon: faCog, label: t('panel.settings') },
+  ];
+
   return (
     <nav className="w-12 border-r border-[#30363d] bg-[#0d1117] flex flex-col items-center py-4 space-y-6 text-gray-500 flex-shrink-0">
       {items.slice(0, 6).map(({ panel, icon, label }) => (
@@ -36,7 +38,7 @@ export function ActivityBar({ activePanel, onSelect }: Props) {
       ))}
       <div className="flex-1" />
       <button
-        title="Настройки"
+        title={t('panel.settings')}
         onClick={() => onSelect('settings')}
         className={`text-xl cursor-pointer transition-colors ${activePanel === 'settings' ? 'text-gray-200' : 'hover:text-gray-200'}`}
       >

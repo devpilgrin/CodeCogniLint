@@ -2,18 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import type { WorkspaceInfo, TreeNode, FileContentResponse } from '../types';
 import { workspaceApi } from '../services/api';
+import { useI18n } from '../i18n';
 
-function errMsg(err: unknown, fallback: string): string {
+function errMsg(err: unknown, fallback: string, offline: string): string {
   if (axios.isAxiosError(err) && err.response?.data?.detail) {
     return String(err.response.data.detail);
   }
   if (axios.isAxiosError(err) && err.code === 'ERR_NETWORK') {
-    return 'Бэкенд недоступен. Запустите start-backend.bat.';
+    return offline;
   }
   return fallback;
 }
 
 export function useWorkspace() {
+  const { t } = useI18n();
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -57,7 +59,7 @@ export function useWorkspace() {
       await loadTree();
       return true;
     } catch (err) {
-      setError(errMsg(err, 'Не удалось открыть проект'));
+      setError(errMsg(err, t('err.openProject'), t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -73,7 +75,7 @@ export function useWorkspace() {
       await loadTree();
       return true;
     } catch (err) {
-      setError(errMsg(err, 'Не удалось клонировать репозиторий'));
+      setError(errMsg(err, t('err.cloneRepo'), t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -93,7 +95,7 @@ export function useWorkspace() {
     try {
       return await workspaceApi.getFile(path);
     } catch (err) {
-      setError(errMsg(err, 'Не удалось прочитать файл'));
+      setError(errMsg(err, t('err.readFile'), t('err.backendOfflineDetail')));
       return null;
     }
   }, []);
@@ -103,7 +105,7 @@ export function useWorkspace() {
       await workspaceApi.saveFile(path, content);
       return null;
     } catch (err) {
-      return errMsg(err, 'Не удалось сохранить файл');
+      return errMsg(err, t('err.saveFile'), t('err.backendOfflineDetail'));
     }
   }, []);
 
