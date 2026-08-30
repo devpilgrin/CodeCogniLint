@@ -24,7 +24,7 @@
 - **Качество кода** — производительность (semgrep-паттерны: sync в async, glob в цикле, index-as-key…), размер (LOC, длина функций, цикломатическая сложность через radon), best practices; рейтинг hotspot'ов + опциональный LLM-разбор топ-3
 - **Watch-режим** — авто-перескан при изменении файлов: SSE-поток, debounce на серию сохранений, детерминированные слои без LLM
 - **PR/MR-интеграция** — создание GitHub PR и GitLab MR прямо из панели Git (push + API хоста), LLM-генерация заголовка/описания по diff
-- **Гейты в CI** — pytest (44 теста), semgrep security-gate, pip-audit без исключений, ratchet quality-gate по `.ccl-quality.yml`, выгрузка SARIF в GitHub Code Scanning
+- **Гейты в CI** — pytest (48 тестов), semgrep security-gate, pip-audit без исключений, ratchet quality-gate по `.ccl-quality.yml`, выгрузка SARIF в GitHub Code Scanning
 - **Бенчмарк LLM** — эталонный набор верификации находок (TP/FP с ловушками), метрики accuracy/P/R/F1 по моделям
 - **Docker** — один контейнер = UI + API (multi-stage сборка)
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
@@ -225,7 +225,7 @@ LLM_API_KEY=lm-studio
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # unit + smoke (44 теста)
+python -m pytest tests/ -q          # unit + smoke (48 тестов)
 
 python quality_gate.py ..           # ratchet-гейт качества (бюджеты из ../.ccl-quality.yml)
 python sarif_export.py .. out.sarif # полный security-скан → SARIF
@@ -281,6 +281,7 @@ CodeCogniLint/
 │       ├── audit_agent.py            # оркестратор аудита: домены, суб-агенты, синтезатор
 │       ├── quality_service.py        # качество: правила, метрики LOC/CC, hotspots, гейт-конфиг
 │       ├── watch_service.py          # watch: снапшот mtime, дельта, rescan по SSE
+│       ├── compare_service.py        # сравнение веток: semgrep на worktrees, fingerprint-diff
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython + PR/MR (GitHub/GitLab API), токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone

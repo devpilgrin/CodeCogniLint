@@ -26,7 +26,7 @@ A hybrid code analysis system for the web: Git-history statistics + LLM semantic
 - **PR/MR integration** — creating GitHub PRs and GitLab MRs straight from the Git panel (push + host API), LLM-generated title/description from the diff
 - **Commit review** — review button on any commit in history: `git show` diff + LLM reviewer (per-file, focused on changed lines), verdict approve/comment/request_changes
 - **Branch comparison** — deterministic violation diff between refs: semgrep (security+quality) on git worktrees of the base and head branches, fingerprint comparison on changed files only, no LLM
-- **CI gates** — pytest (44 tests), semgrep security gate, pip-audit without exceptions, ratchet quality gate driven by `.ccl-quality.yml`, SARIF upload to GitHub Code Scanning
+- **CI gates** — pytest (48 tests), semgrep security gate, pip-audit without exceptions, ratchet quality gate driven by `.ccl-quality.yml`, SARIF upload to GitHub Code Scanning
 - **LLM benchmark** — a golden verification set of findings (TP/FP with traps), accuracy/P/R/F1 metrics per model
 - **Docker** — one container = UI + API (multi-stage build)
 - **File analysis** — LLM finds violations; Monaco highlights lines with squiggle markers and hover descriptions
@@ -227,7 +227,7 @@ The backend runs at `http://localhost:8000`, Swagger at `/docs`.
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # unit + smoke (44 tests)
+python -m pytest tests/ -q          # unit + smoke (48 tests)
 
 python quality_gate.py ..           # ratchet quality gate (budgets from ../.ccl-quality.yml)
 python sarif_export.py .. out.sarif # full security scan → SARIF
@@ -283,6 +283,7 @@ CodeCogniLint/
 │       ├── audit_agent.py            # audit orchestrator: domains, sub-agents, synthesizer
 │       ├── quality_service.py        # quality: rules, LOC/CC metrics, hotspots, gate config
 │       ├── watch_service.py          # watch: mtime snapshot, delta, rescan over SSE
+│       ├── compare_service.py        # branch comparison: semgrep on worktrees, fingerprint diff
 │       ├── rules_service.py          # load/save/add/update/delete
 │       ├── git_service.py            # GitPython + PR/MR (GitHub/GitLab API), token in URL only for the call duration
 │       └── workspace_service.py      # tree walk, reading, writing, git clone
@@ -394,5 +395,4 @@ CodeCogniLint/
 - UI localization: ru / en / zh / es
 
 **In development:**
-- Specific commit analysis (`git diff` + LLM comments)
-- Violation comparison between branches
+- Auto-fix for findings (apply patch from LLM recommendations)
