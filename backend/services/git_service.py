@@ -253,42 +253,31 @@ def log(workspace: str, limit: int = 10) -> dict:
 
 _GITHUB_URL_RE = re.compile(
     r"(?:https://github\.com/|git@github\.com:)(?P<owner>[^/]+)/(?P<repo>[^/.]+?)(?:\.git)?$")
+_GENERIC_URL_RE = re.compile(
+    r"(?:https://(?P<host>[^/]+)/|git@(?P<host2>[^:]+):)(?P<path>[^/]+/[^/.]+?)(?:\.git)?$")
 
 
-def _github_slug(url: str) -> tuple[str, str]:
-    m = _GITHUB_URL_RE.search(url.strip())
-    if not m:
-        raise GitError(
-            "PR поддержан для remote github.com (https или ssh). "
-            f"Текущий remote: {_sanitize_url(url)}")
-    return m.group("owner"), m.group("repo")
+def _parse_remote(url: str) -> tuple[str, str, str]:
+    """Разобрать remote URL → (kind, host, path 'owner/repo').
+    kind: 'github' | 'gitlab' (gitlab.com или self-hosted по подстроке в хосте)."""
+    url = url.strip()
+    m = _GITHUB_URL_RE.search(url)
+    if m:
+        return ("github", "github.com", f"{m.group('owner')}/{m.group('repo')}")
+    m = _GENERIC_URL_RE.search(url)
+    if m:
+        host = m.group("host") or m.group("host2")
+        if host and "gitlab" in host.lower():
+            return ("gitlab", host, m.group("path"))
+    raise GitError(
+        "PR/MR поддержан для github.com и GitLab-хостов (https или ssh). "
+        f"Текущий remote: {_sanitize_url(url)}")
 
 
-def create_pr(workspace: str, title: str, body: str = "", base: str = "main",
-              token: Optional[str] = None) -> dict:
-    """Создать Pull Request на GitHub: push текущей ветки + API GitHub.
-
-    Токен — из запроса / GIT_TOKEN / GITHUB_TOKEN (в конфиг не сохраняется)."""
-    title = (title or "").strip()
-    if not title:
-        raise GitError("Заголовок PR пустой")
-
-    repo = _repo(workspace)
-    push_result = push(workspace, token=token)
-
-    if "origin" not in [r.name for r in repo.remotes]:
-        raise GitError("У репозитория нет remote 'origin'")
-    owner, name = _github_slug(repo.remote("origin").url)
-    branch = push_result["branch"]
-    if branch == base:
-        raise GitError(f"Текущая ветка совпадает с base ({base}) — PR не из чего создать")
-
-    tk = _token(token)
-    if not tk:
-        raise GitError("Для создания PR нужен токен (GIT_TOKEN/GITHUB_TOKEN или параметр)")
-
+def _github_pr(host: str, path: str, branch: str, base: str,
+               title: str, body: str, tk: str) -> dict:
     import requests
-    api = f"https://api.github.com/repos/{owner}/{name}/pulls"
+    api = f"https://api.github.com/repos/{path}/pulls"
     headers = {"Authorization": f"Bearer {tk}", "Accept": "application/vnd.github+json"}
     payload = {"title": title, "head": branch, "base": base, "body": body}
     try:
@@ -302,6 +291,7 @@ def create_pr(workspace: str, title: str, body: str = "", base: str = "main",
                 "base": base, "created": True}
     if r.status_code == 422:
         # PR для этой ветки уже существует — возвращаем его
+        owner = path.split("/", 1)[0]
         lst = requests.get(api, params={"head": f"{owner}:{branch}", "state": "open"},
                            headers=headers, timeout=15)
         if lst.ok and lst.json():
@@ -310,6 +300,65 @@ def create_pr(workspace: str, title: str, body: str = "", base: str = "main",
                     "base": base, "created": False}
         raise GitError(f"GitHub отклонил PR: {r.json().get('message', r.status_code)}")
     raise GitError(f"GitHub API: {r.status_code} {r.json().get('message', '')[:200]}")
+
+
+def _gitlab_mr(host: str, path: str, branch: str, base: str,
+               title: str, body: str, tk: str) -> dict:
+    import requests
+    from urllib.parse import quote
+    api = f"https://{host}/api/v4/projects/{quote(path, safe='')}/merge_requests"
+    headers = {"PRIVATE-TOKEN": tk}
+    payload = {"source_branch": branch, "target_branch": base,
+               "title": title, "description": body}
+    try:
+        r = requests.post(api, json=payload, headers=headers, timeout=15)
+    except requests.RequestException as e:
+        raise GitError(f"GitLab API недоступен: {e}")
+
+    if r.status_code == 201:
+        mr = r.json()
+        return {"url": mr["web_url"], "number": mr["iid"], "branch": branch,
+                "base": base, "created": True}
+    if r.status_code in (400, 409):
+        # MR для этой ветки уже существует — возвращаем его
+        lst = requests.get(api, params={"source_branch": branch, "state": "opened"},
+                           headers=headers, timeout=15)
+        if lst.ok and lst.json():
+            mr = lst.json()[0]
+            return {"url": mr["web_url"], "number": mr["iid"], "branch": branch,
+                    "base": base, "created": False}
+        msg = r.json().get("message", r.status_code)
+        raise GitError(f"GitLab отклонил MR: {msg}")
+    raise GitError(f"GitLab API: {r.status_code} {str(r.json().get('message', ''))[:200]}")
+
+
+def create_pr(workspace: str, title: str, body: str = "", base: str = "main",
+              token: Optional[str] = None) -> dict:
+    """Создать Pull Request (GitHub) или Merge Request (GitLab):
+    push текущей ветки + API хоста. Хост определяется по remote origin.
+
+    Токен — из запроса / GIT_TOKEN / GITHUB_TOKEN (в конфиг не сохраняется)."""
+    title = (title or "").strip()
+    if not title:
+        raise GitError("Заголовок PR/MR пустой")
+
+    repo = _repo(workspace)
+    push_result = push(workspace, token=token)
+
+    if "origin" not in [r.name for r in repo.remotes]:
+        raise GitError("У репозитория нет remote 'origin'")
+    kind, host, path = _parse_remote(repo.remote("origin").url)
+    branch = push_result["branch"]
+    if branch == base:
+        raise GitError(f"Текущая ветка совпадает с base ({base}) — PR/MR не из чего создать")
+
+    tk = _token(token)
+    if not tk:
+        raise GitError("Для создания PR/MR нужен токен (GIT_TOKEN/GITHUB_TOKEN или параметр)")
+
+    if kind == "github":
+        return _github_pr(host, path, branch, base, title, body, tk)
+    return _gitlab_mr(host, path, branch, base, title, body, tk)
 
 
 def pr_context(workspace: str, base: str = "main") -> dict:

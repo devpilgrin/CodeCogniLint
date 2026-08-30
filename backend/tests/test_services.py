@@ -171,6 +171,18 @@ def test_sca_no_manifests_no_cache(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------ гейт качества
 
+def test_remote_parsing():
+    from services.git_service import _parse_remote, GitError
+    assert _parse_remote("https://github.com/devpilgrin/CodeCogniLint.git") == \
+        ("github", "github.com", "devpilgrin/CodeCogniLint")
+    assert _parse_remote("git@github.com:devpilgrin/CodeCogniLint.git")[0] == "github"
+    assert _parse_remote("https://gitlab.com/grp/proj.git") == ("gitlab", "gitlab.com", "grp/proj")
+    assert _parse_remote("git@gitlab.local:team/tool.git") == ("gitlab", "gitlab.local", "team/tool")
+    assert _parse_remote("https://gitlab.company.ru/a/b.git")[1] == "gitlab.company.ru"
+    import pytest as _pt
+    with _pt.raises(GitError):
+        _parse_remote("https://bitbucket.org/a/b.git")
+
 def test_gate_config_defaults_without_file(tmp_path):
     cfg = qs.load_gate_config(str(tmp_path))
     assert cfg["thresholds"]["func_cc"] == 10

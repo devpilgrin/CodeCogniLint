@@ -166,7 +166,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
               title="Создать Pull Request на GitHub (push + API)"
             >
               <FontAwesomeIcon icon={faCodePullRequest} className="mr-1" />
-              Pull Request {prOpen ? '▴' : '▾'}
+              PR / MR {prOpen ? '▴' : '▾'}
             </button>
             {prOpen && (
               <div className="mt-1.5 space-y-1.5">
@@ -205,7 +205,7 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
                   disabled={busy !== null || (!prLlm && !prTitle.trim())}
                   className="w-full text-[11px] py-1.5 rounded border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-300 transition-colors disabled:opacity-40"
                 >
-                  {busy === 'pr' ? 'Создание PR...' : 'Создать PR (push + GitHub)'}
+                  {busy === 'pr' ? 'Создание...' : 'Создать PR/MR (push + API)'}
                 </button>
                 {prResult && (
                   <a
