@@ -74,6 +74,8 @@ jobs:
   security:
     name: Security gate
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # загрузка SARIF в Code Scanning
     steps:
       - uses: actions/checkout@v4
 
@@ -94,6 +96,18 @@ jobs:
         run: |
           pip install pip-audit==2.9.0
           pip-audit -r backend/requirements.txt --progress-spinner off
+
+      # Полный скан всех слоёв → SARIF → GitHub Code Scanning
+      - name: SARIF export (все слои security-скана)
+        run: |
+          pip install -r backend/requirements.txt
+          python backend/sarif_export.py . codecognilint.sarif
+
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: codecognilint.sarif
+          category: codecognilint
 
       # Frontend-зависимости — совещательно (registry churn не должен блокировать CI)
       - name: npm audit (advisory)

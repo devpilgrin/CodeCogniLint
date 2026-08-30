@@ -169,6 +169,30 @@ def test_sca_no_manifests_no_cache(tmp_path, monkeypatch):
     assert not (tmp_path / "sca-cache.json").exists()
 
 
+# ------------------------------------------------------------------ SARIF
+
+def test_sarif_structure():
+    report = {
+        "findings": [{"rule_id": "py-sqli", "severity": "critical", "cwe": "CWE-89",
+                      "owasp": "A03", "path": "a.py", "line_start": 3, "line_end": 3,
+                      "title": "SQLi", "message": "m", "snippet": "x",
+                      "suppressed": False, "tool": "semgrep"}],
+        "workspace": "/w",
+        "scanned_at": "t",
+    }
+    sarif = sec.to_sarif(report)
+    run = sarif["runs"][0]
+    assert sarif["version"] == "2.1.0"
+    assert run["tool"]["driver"]["rules"][0]["id"] == "py-sqli"
+    res = run["results"][0]
+    assert res["ruleId"] == "py-sqli"
+    loc = res["locations"][0]["physicalLocation"]
+    assert loc["artifactLocation"]["uri"] == "a.py" and loc["region"]["startLine"] == 3
+    # suppressed-находки в SARIF не попадают
+    report["findings"][0]["suppressed"] = True
+    assert sec.to_sarif(report)["runs"][0]["results"] == []
+
+
 # ------------------------------------------------------------------ гейт качества
 
 def test_remote_parsing():
