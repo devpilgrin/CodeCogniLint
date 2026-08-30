@@ -159,6 +159,19 @@ def test_pentest_headers_helper():
     assert not ok
 
 
+def test_secrets_skip_fixture_dirs(tmp_path):
+    # ключ собирается по частям, чтобы сам тест не ловился сканером секретов
+    fake_key = "AKIA" + "IOSFODNN7" + "EXAMPLE"
+    bench = tmp_path / "benchmark"
+    bench.mkdir()
+    (bench / "fixture.py").write_text(f"AWS_KEY = '{fake_key}'\n", encoding="utf-8")
+    (tmp_path / "real.py").write_text(f"AWS_KEY = '{fake_key}'\n", encoding="utf-8")
+    r = sec.scan_secrets(str(tmp_path))
+    paths = {f["path"] for f in r["findings"]}
+    assert not any("benchmark" in pth for pth in paths)
+    assert any("real.py" in pth for pth in paths)
+
+
 # ------------------------------------------------------------------ SCA-кэш
 
 def test_sca_cache_hit_skips_scan(tmp_path, monkeypatch):

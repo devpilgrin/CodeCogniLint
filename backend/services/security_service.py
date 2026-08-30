@@ -21,6 +21,10 @@ from typing import Optional
 from .llm_adapter import chat_completion, LLMError
 from .workspace_service import SKIP_DIRS, EXT_TO_LANG
 
+# Директории тестовых фикстур: исключаются из скана секретов
+# (в них намеренно лежат ловушки вида плейсхолдер-ключей)
+FIXTURE_DIRS = {"benchmark", "fixtures", "testdata", "__fixtures__", "__mocks__"}
+
 BACKEND_DIR = Path(__file__).parent.parent
 SEMGREP_RULES = BACKEND_DIR / "security" / "semgrep-rules.yml"
 BASELINES_FILE = BACKEND_DIR / ".hybrid-security-baselines.json"
@@ -147,7 +151,7 @@ def scan_semgrep(workspace: str) -> dict:
 def _iter_text_files(root: Path, limit: int = MAX_FILES_FOR_SECRETS):
     count = 0
     for current, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and d not in FIXTURE_DIRS and not d.startswith(".")]
         for fname in sorted(filenames):
             if count >= limit:
                 return
@@ -194,6 +198,7 @@ def _scan_secrets_gitleaks(workspace: str) -> dict:
             cwe="CWE-798",
         )
         for f in data
+        if not set(Path(f.get("File", "")).parts) & FIXTURE_DIRS
     ]
     return {"status": "ok", "findings": findings}
 
