@@ -628,8 +628,11 @@ def _apply_baseline_diff(workspace: str, report: dict) -> None:
 # ------------------------------------------------------------------- SARIF
 
 def to_sarif(report: dict) -> dict:
-    """SARIF 2.1.0 — совместимость с GitHub Code Scanning и CI-системами."""
+    """SARIF 2.1.0 — совместимость с GitHub Code Scanning и CI-системами.
+    security-severity — ЧИСЛОВАЯ строка (CVSS-подобная), иначе Code Scanning
+    отклоняет файл."""
     level_map = {"critical": "error", "warning": "warning", "info": "note"}
+    sec_sev = {"critical": "9.0", "warning": "5.0", "info": "2.0"}
     rules: dict[str, dict] = {}
     results = []
     for f in report["findings"]:
@@ -642,7 +645,8 @@ def to_sarif(report: dict) -> dict:
                 "id": rid,
                 "name": rid,
                 "shortDescription": {"text": f["title"]},
-                "properties": {"tags": tags, "security-severity": f["severity"]},
+                "properties": {"tags": tags,
+                               "security-severity": sec_sev.get(f["severity"], "2.0")},
             }
         results.append({
             "ruleId": rid,

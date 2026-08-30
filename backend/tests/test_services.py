@@ -186,6 +186,7 @@ def test_sarif_structure():
     assert run["tool"]["driver"]["rules"][0]["id"] == "py-sqli"
     res = run["results"][0]
     assert res["ruleId"] == "py-sqli"
+    assert run["tool"]["driver"]["rules"][0]["properties"]["security-severity"] == "9.0"
     loc = res["locations"][0]["physicalLocation"]
     assert loc["artifactLocation"]["uri"] == "a.py" and loc["region"]["startLine"] == 3
     # suppressed-находки в SARIF не попадают
