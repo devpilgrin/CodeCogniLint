@@ -228,3 +228,4 @@ backend.log
 frontend.log
 backend/.schemathesis/
 backend/.hybrid-sca-cache.json
+backend/static/

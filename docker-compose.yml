@@ -1,0 +1,18 @@
+# Опционально: запуск через compose (достаточно и просто docker build/run)
+services:
+  codecognilint:
+    build: .
+    ports:
+      - "8000:8000"
+    # LLM-настройки и токен git — через env (или примонтируйте свой .env):
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      LLM_MODEL: ${LLM_MODEL:-local-model}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-1.0}
+      # LLM_API_KEY: ...
+      # GIT_TOKEN: ...
+    # Сканировать проекты хоста: монтируйте их в контейнер
+    # volumes:
+    #   - /path/to/your/projects:/projects:ro
+    restart: unless-stopped

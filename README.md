@@ -41,7 +41,17 @@
 
 ## Быстрый старт
 
-Требования: **Node.js 18+**, **Python 3.11+**, **LM Studio** (для локального LLM) или ключ OpenAI/Anthropic.
+### Вариант 0: Docker (всё в одном контейнере)
+
+```bash
+docker build -t codecognilint .
+docker run -p 8000:8000 codecognilint
+# UI и API: http://localhost:8000
+```
+
+Или `docker compose up` (переменные LLM — через env, см. `docker-compose.yml`).
+
+### Вариант 1: одной командой (dev)
 
 ### Linux / macOS
 
@@ -311,6 +321,7 @@ CodeCogniLint/
 - **Тестовый контур** — pytest: unit-тесты сервисов (suppression/baseline/fingerprint, санитайзеры отчётов, валидация настроек, метрики качества) + smoke-эндпоинтов через TestClient; прогон в CI
 - **Гейт качества в CI (ratchet)** — `.ccl-quality.yml` в корне проекта: пороги метрик + бюджеты находок; регресс (счётчик выше бюджета) роняет сборку; `ccl:ignore` учитывается
 - **Производительность сканов** — параллельный запуск независимых слоёв (semgrep/secrets/SCA, quality rules+metrics); SCA-кэш по хешу манифестов (повторный скан без изменений ~40x быстрее); манифесты ищутся рекурсивно (backend/requirements.txt, frontend/package-lock.json)
+- **Docker-дистрибуция** — multi-stage образ: frontend собирается и раздаётся FastAPI как статика; один контейнер = UI + API; CONTRIBUTING.md для участников
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

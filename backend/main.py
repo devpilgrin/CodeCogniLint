@@ -119,3 +119,12 @@ app.openapi = custom_openapi
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+# Раздача собранного frontend (docker/прод-режим): backend/static монтируется
+# ПОСЛЕ api-роутеров — API-маршруты имеют приоритет над статикой.
+from pathlib import Path as _Path
+_STATIC_DIR = _Path(__file__).parent / "static"
+if (_STATIC_DIR / "index.html").exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
