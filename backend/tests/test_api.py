@@ -1,5 +1,6 @@
 """Smoke-тесты эндпоинтов (TestClient). Тяжёлые LLM-слои не вызываются —
 проверяем контракты, валидацию и устойчивость к мусорным данным."""
+from pathlib import Path
 
 
 def test_health(client):
@@ -205,7 +206,7 @@ def test_watch_stream_starts(client, workspace):
 
 # ------------------------------------------------------------------ коммит-ревью и сравнение веток
 
-REPO = "/home/roman/workspace/CodeCogniLint"
+REPO = str(Path(__file__).resolve().parents[2])  # корень репо (локально и в CI)
 
 
 def test_git_branches(client):

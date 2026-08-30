@@ -24,6 +24,8 @@ A hybrid code analysis system for the web: Git-history statistics + LLM semantic
 - **Code quality** — performance (semgrep patterns: sync calls in async, glob in a loop, index-as-key…), size (LOC, function length, cyclomatic complexity via radon), best practices; hotspot rating + optional LLM review of the top 3
 - **Watch mode** — automatic rescan on file changes: SSE stream, debounce over save bursts, deterministic layers without LLM
 - **PR/MR integration** — creating GitHub PRs and GitLab MRs straight from the Git panel (push + host API), LLM-generated title/description from the diff
+- **Commit review** — review button on any commit in history: `git show` diff + LLM reviewer (per-file, focused on changed lines), verdict approve/comment/request_changes
+- **Branch comparison** — deterministic violation diff between refs: semgrep (security+quality) on git worktrees of the base and head branches, fingerprint comparison on changed files only, no LLM
 - **CI gates** — pytest (44 tests), semgrep security gate, pip-audit without exceptions, ratchet quality gate driven by `.ccl-quality.yml`, SARIF upload to GitHub Code Scanning
 - **LLM benchmark** — a golden verification set of findings (TP/FP with traps), accuracy/P/R/F1 metrics per model
 - **Docker** — one container = UI + API (multi-stage build)
