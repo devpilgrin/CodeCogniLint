@@ -18,7 +18,13 @@
 - **Security-скан (SAST/SCA)** — детерминированный слой: Semgrep с вендоренными правилами (CWE/OWASP-метаданные, офлайн), поиск секретов (gitleaks или встроенные regex), уязвимости зависимостей (pip-audit / npm audit); опциональный второй проход — LLM-верификатор подтверждает/опровергает находки
 - **Дисциплина анализа** — suppression-комментарии `# ccl:ignore [rule]`, baseline/diff находок между сканами (новые / исправленные), метрики покрытия (сколько файлов реально проанализировано), экспорт SARIF 2.1.0 для GitHub Code Scanning; security-gate в CI (semgrep --error + pip-audit)
 - **Пентест-контур (DAST)** — проверки живого приложения по URL: security-заголовки, CORS (отражение Origin, `*`+credentials), TRACE, открытые .env/.git/docs; фаззинг API по OpenAPI (schemathesis, junit-парсинг отчёта); nuclei при наличии; опциональная LLM-интерпретация (уровень риска + приоритизированные рекомендации)
-- **Мульти-агентный аудит** — находки группируются по доменам (инъекции / аутентификация и секреты / криптография / конфигурация / зависимости), каждый разбирает свой суб-агент с экспертным промптом и контекстом кода; синтезатор выносит итоговый вердикт с векторами атаки и приоритетами; матрица рисков CWE × тяжесть × эксплуатируемость
+- **Мульти-агентный аудит** — находки группируются по доменам (инъекции / аутентификация и секреты / криптография / конфигурация / зависимости), каждый разбирает свой суб-агент с экспертным промптом и контекстом кода; синтезатор выносит итоговый вердикт с векторами атаки и приоритетами; матрица рисков CWE × тяжесть × эксплуатируемость; HTML-экспорт отчёта
+- **Качество кода** — производительность (semgrep-паттерны: sync в async, glob в цикле, index-as-key…), размер (LOC, длина функций, цикломатическая сложность через radon), best practices; рейтинг hotspot'ов + опциональный LLM-разбор топ-3
+- **Watch-режим** — авто-перескан при изменении файлов: SSE-поток, debounce на серию сохранений, детерминированные слои без LLM
+- **PR/MR-интеграция** — создание GitHub PR и GitLab MR прямо из панели Git (push + API хоста), LLM-генерация заголовка/описания по diff
+- **Гейты в CI** — pytest (44 теста), semgrep security-gate, pip-audit без исключений, ratchet quality-gate по `.ccl-quality.yml`, выгрузка SARIF в GitHub Code Scanning
+- **Бенчмарк LLM** — эталонный набор верификации находок (TP/FP с ловушками), метрики accuracy/P/R/F1 по моделям
+- **Docker** — один контейнер = UI + API (multi-stage сборка)
 - **Анализ файла** — LLM находит нарушения, Monaco подсвечивает строки squiggle-маркерами с ховер-описанием
 - **Анализ всего проекта** — потоковый обход через SSE, прогресс в реальном времени, лимиты на размер/количество файлов
 - **Точные номера строк** — двухслойная защита: префикс номеров в промпте + поиск `code_snippet` в реальном файле для коррекции
@@ -35,8 +41,13 @@
 | Редактор   | Monaco Editor (`@monaco-editor/react`)           |
 | Backend    | Python 3.11+, FastAPI, Uvicorn                   |
 | LLM-клиент | OpenAI SDK (совместим с LM Studio, OpenAI, …)    |
-| Git        | GitPython (clone)                                |
+| Git        | GitPython (status/diff/commit/push/pull/clone)   |
+| SAST/SCA   | Semgrep (вендоренные правила), gitleaks (опц.), pip-audit, npm audit |
+| DAST       | Schemathesis (OpenAPI-фаззинг), nuclei (опц.)    |
+| Качество   | radon (цикломатическая сложность), Semgrep-паттерны |
 | Стриминг   | Server-Sent Events (`StreamingResponse`)         |
+| Тесты      | pytest + FastAPI TestClient                      |
+| Упаковка   | Docker (multi-stage), docker-compose             |
 
 
 ## Быстрый старт
@@ -102,12 +113,14 @@ LLM_PROVIDER=lmstudio
 LLM_BASE_URL=http://localhost:1234/v1
 LLM_MODEL=local-model
 LLM_API_KEY=lm-studio
+# Температура LLM (некоторые модели принимают только 1.0):
+# LLM_TEMPERATURE=0.3
 
 # Для облачных провайдеров:
 # OPENAI_API_KEY=sk-...
 # ANTHROPIC_API_KEY=sk-ant-...
 
-# Токен для git push/pull по HTTPS (GitHub PAT; для SSH-remote не нужен):
+# Токен для git push/pull/PR по HTTPS (GitHub PAT / GitLab token; для SSH-remote не нужен):
 # GIT_TOKEN=ghp_...
 ```
 
@@ -150,7 +163,7 @@ LLM_API_KEY=lm-studio
 | Вкладка        | Содержимое                                                   |
 | -- |  |
 | **Файл**       | Карточки нарушений с переходом к строке, кнопкой «Спросить LLM об исправлении» |
-| Коммит / PR/MR / Репо | Заглушки — функциональность в разработке              |
+| **Ревью**      | Агент код-ревью: вердикт, замечания по строкам, сильные стороны (файл / git-изменения) |
 | **Чат**        | Диалог с LLM (контекст активного файла), сообщения об ошибках, поле ввода |
 
 
@@ -198,7 +211,25 @@ LLM_API_KEY=lm-studio
 | GET   | `/api/analysis/repository/stream` | SSE: анализ всего проекта                 |
 | POST  | `/api/analysis/chat`              | Чат с LLM (с нормализацией истории)       |
 | GET   | `/api/settings`                   | Текущие настройки LLM                     |
-| PUT   | `/api/settings`                   | Обновить настройки (с записью в `.env`)   |
+| PUT   | `/api/settings`                   | Обновить настройки (валидация + атомарная запись `.env`) |
+
+
+## Разработка и тестирование
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q          # unit + smoke (44 теста)
+
+python quality_gate.py ..           # ratchet-гейт качества (бюджеты из ../.ccl-quality.yml)
+python sarif_export.py .. out.sarif # полный security-скан → SARIF
+
+# Бенчмарк LLM (нужен ключ провайдера в env):
+python benchmark/run_benchmark.py                    # все модели из models.yml
+python benchmark/run_benchmark.py --models kimi-k3   # выборочно
+```
+
+Правила участия, гейты перед PR и релизный процесс — в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 ## Структура проекта
@@ -206,38 +237,46 @@ LLM_API_KEY=lm-studio
 ```
 CodeCogniLint/
 ├── backend/
-│   ├── main.py                       # FastAPI app, CORS, регистрация роутеров
-│   ├── requirements.txt
+│   ├── main.py                       # FastAPI app, CORS, роутеры, security-заголовки, Allow на 405, раздача static
+│   ├── requirements.txt / -dev.txt   # prod-зависимости / pytest
 │   ├── .env(.example)                # настройки LLM
 │   ├── .hybrid-rules.json            # хранилище правил
-│   ├── .hybrid-workspace.json        # текущий проект + recent
+│   ├── quality_gate.py               # CLI ratchet-гейта качества (CI)
+│   ├── sarif_export.py               # CLI: полный скан → SARIF (CI → Code Scanning)
 │   ├── projects/                     # сюда клонируются git-репо
 │   ├── routers/
 │   │   ├── analysis.py               # /file, /repository/stream, /chat
 │   │   ├── rules.py                  # CRUD правил + /generate (LLM)
 │   │   ├── workspace.py              # open/clone/tree/file/browse + сохранение файла
-│   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log
+│   │   ├── gitops.py                 # /git: status/diff/commit/push/pull/log/pr
 │   │   ├── review.py                 # /review: агент код-ревью (file, changes)
 │   │   ├── security.py               # /security: tools + scan + sarif + baseline
 │   │   ├── pentest.py                # /pentest: DAST по URL (config/fuzz/nuclei)
 │   │   ├── audit.py                  # /audit: мульти-агентный аудит + HTML
 │   │   ├── quality.py                # /quality: производительность/размер/практики
-│   │   └── settings.py               # LLM-настройки + запись в .env
+│   │   ├── watch.py                  # /watch/stream: SSE авто-пересканов
+│   │   └── settings.py               # LLM-настройки: валидация + атомарная запись .env
 │   ├── security/
 │   │   └── semgrep-rules.yml         # вендоренные правила с CWE/OWASP (офлайн)
 │   ├── quality/
 │   │   └── quality-rules.yml         # производительность + best practices (офлайн)
+│   ├── benchmark/
+│   │   ├── verification_set.json     # эталон верификации (TP/FP с ловушками)
+│   │   ├── models.yml                # модели для прогона (ключи через env)
+│   │   ├── run_benchmark.py          # раннер: accuracy/P/R/F1 + латентность
+│   │   └── results/                  # JSON-отчёты прогонов
 │   ├── tests/                        # pytest: unit (сервисы) + smoke (API)
 │   └── services/
-│       ├── llm_adapter.py            # LLMError + friendly error mapping
+│       ├── llm_adapter.py            # LLMError + friendly error mapping, LLM_TEMPERATURE
 │       ├── analysis_service.py       # построение промпта, snippet-based коррекция строк
 │       ├── review_agent.py           # агент код-ревью: вердикт, issues, positives
-│       ├── security_service.py       # semgrep/gitleaks/pip-audit + LLM-верификатор + baseline/sarif
+│       ├── security_service.py       # semgrep/gitleaks/pip-audit + верификатор + baseline/sarif + SCA-кэш
 │       ├── pentest_service.py        # DAST: config-checks, schemathesis, nuclei, LLM-интерпретация
 │       ├── audit_agent.py            # оркестратор аудита: домены, суб-агенты, синтезатор
-│       ├── quality_service.py        # качество: semgrep-правила, метрики LOC/CC, hotspots
+│       ├── quality_service.py        # качество: правила, метрики LOC/CC, hotspots, гейт-конфиг
+│       ├── watch_service.py          # watch: снапшот mtime, дельта, rescan по SSE
 │       ├── rules_service.py          # load/save/add/update/delete
-│       ├── git_service.py            # GitPython: status/diff/commit/push/pull, токен в URL только на время вызова
+│       ├── git_service.py            # GitPython + PR/MR (GitHub/GitLab API), токен в URL только на время вызова
 │       └── workspace_service.py      # обход дерева, чтение, запись, git clone
 │
 ├── frontend/
@@ -265,15 +304,21 @@ CodeCogniLint/
 │       ├── hooks/
 │       │   ├── useRules.ts
 │       │   ├── useAnalysis.ts        # одиночный + SSE репо
-│       │   ├── useGit.ts             # статус/commit/push/pull + уведомления
+│       │   ├── useGit.ts             # статус/commit/push/pull/PR + уведомления
 │       │   ├── useReview.ts          # агент код-ревью (file / changes)
-│       │   ├── useSecurity.ts        # security-скан + статус инструментов
+│       │   ├── useSecurity.ts        # security-скан + baseline + watch (SSE)
 │       │   ├── usePentest.ts         # DAST-скан цели по URL
-│       │   ├── useAudit.ts           # мульти-агентный аудит
+│       │   ├── useAudit.ts           # мульти-агентный аудит + HTML-экспорт
+│       │   ├── useQuality.ts         # качество: скан + инструменты
 │       │   └── useWorkspace.ts
 │       ├── services/api.ts           # axios-клиенты
 │       └── types/index.ts
 │
+├── .ccl-quality.yml                  # ratchet-бюджеты гейта качества (CI)
+├── Dockerfile                        # multi-stage: frontend build → backend + статика
+├── docker-compose.yml                # опционально (LLM через env)
+├── .dockerignore
+├── CONTRIBUTING.md                   # окружение, гейты перед PR, принципы, релизный процесс
 ├── start-all.sh / .bat                 # запуск обоих сервисов (Linux/macOS / Windows)
 ├── start-backend.sh / .bat
 ├── start-frontend.sh / .bat
@@ -298,6 +343,13 @@ CodeCogniLint/
 - **Security-gate в CI** — semgrep с вендоренными правилами роняет сборку на любой находке; pip-audit по `requirements.txt` без исключений (зависимости держатся на версиях без известных CVE); npm audit — совещательно
 - **DAST-пентест** — встроенные config-checks (заголовки/CORS/TRACE/.env/.git) без зависимостей; фаззинг API через schemathesis по `/openapi.json` с junit-парсингом; nuclei — feature-detect. Синхронные HTTP и CLI вынесены в потоки (`asyncio.to_thread`), иначе самосканирование блокирует event loop
 - **Мульти-агентный аудит** — LLM работают только поверх детерминированных находок: группировка по CWE/инструменту в домены, параллельные суб-агенты с экспертными промптами (`asyncio.gather`), синтезатор-верификатор; без находок LLM не вызывается вовсе
+- **API-гигиена** — security-заголовки на все ответы (middleware); коды ошибок (400/404/409/503) задокументированы глобально в OpenAPI; `Allow` на 405 пересобирается из маршрутов (статические пути в приоритете над `{param}`); StrictBool/pattern-ограничения в pydantic-моделях; санитайзеры отчётов от недопустимых XML-символов — собственный пентест (schemathesis) доведён с 35 сбоев до 0 дефектов корректности
+- **Атомарные настройки** — `PUT /settings` валидирует весь набор ДО записи, `.env` переписывается через tmp+`os.replace`, in-memory применяется только после успешной записи
+- **Параллельные слои и SCA-кэш** — независимые инструменты (semgrep/secrets/SCA, quality rules+metrics) запускаются конкурентно (`asyncio.gather`+`to_thread`); SCA кэшируется по sha256 манифестов (`.hybrid-sca-cache.json`), повторный скан без изменений ~40x быстрее; манифесты ищутся рекурсивно
+- **Гейт качества (ratchet)** — `.ccl-quality.yml`: пороги метрик + бюджеты счётчиков (находки/сложные/длинные/большие); `backend/quality_gate.py` падает exit 1 при регрессе; `ccl:ignore`/`ccl:ignore-file` учитываются; бюджеты ужимаются по мере разбора долга
+- **Watch-режим** — polling-снапшот mtime кодовых файлов (без зависимостей), debounce на серию сохранений, rescan детерминированными слоями (LLM не вызывается — токены не расходуются), отчёт по SSE
+- **PR/MR-контур** — хост определяется по remote (GitHub/GitLab/self-hosted); push перед созданием; существующий PR/MR возвращается вместо ошибки; LLM-генерация заголовка/описания по `diff --stat` и коммитам
+- **Бенчмарк как разметка истины** — верификатор оценивается на эталоне с ловушками (AWS example-ключ, плейсхолдеры, md5 вне security-контекста); модель, подтверждающая по формату, а не по смыслу, теряет баллы
 - **uvicorn `--reload-exclude`** — `projects/*` и `*.json` исключены из watcher'а, чтобы клонированные репо и изменения хранилищ не дёргали перезапуск
 
 
@@ -311,7 +363,7 @@ CodeCogniLint/
 - Git-панель: статус ветки, изменения, commit / push / pull, история
 - Агент код-ревью: вердикт + замечания по строкам + сильные стороны (файл и git-изменения)
 - Security-скан: Semgrep (CWE/OWASP), секреты, уязвимые зависимости + LLM-верификация
-- Suppression `# ccl:ignore`, baseline/diff находок, метрики покрытия, SARIF-экспорт
+- Suppression `# ccl:ignore` и `# ccl:ignore-file`, baseline/diff находок, метрики покрытия, SARIF-экспорт (включая загрузку в GitHub Code Scanning из CI)
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
 - Мульти-агентный аудит: суб-агенты по доменам + синтезатор + матрица рисков (CWE)
 - API-гигиена: security-заголовки, документированные коды/типы ответов, устойчивость к фаззингу (собственный пентест: 35 → 0 дефектов корректности)
@@ -331,5 +383,4 @@ CodeCogniLint/
 
 **В разработке:**
 - Анализ конкретного коммита (`git diff` + LLM-комментарии)
-- Анализ Pull / Merge Request (интеграция с GitHub/GitLab API)
 - Сравнение нарушений между ветками
