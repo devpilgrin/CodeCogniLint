@@ -17,6 +17,9 @@ interface Props {
   scanning: boolean;
   busyBaseline: boolean;
   error: string | null;
+  watching: boolean;
+  lastWatchScan: string | null;
+  onToggleWatch: () => void;
   onScan: (verify: boolean) => void;
   onSaveBaseline: () => void;
   onDropBaseline: () => void;
@@ -68,6 +71,7 @@ const TOOL_NAMES: [string, string][] = [
 ];
 
 export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning, busyBaseline, error,
+  watching, lastWatchScan, onToggleWatch,
   onScan, onSaveBaseline, onDropBaseline, onDownloadSarif, onOpenFinding,
   pentestTools, pentestReport, pentestScanning, pentestError, onPentestLoadTools, onPentestScan,
   auditReport, auditRunning, auditError, onAuditRun, onAuditExportHtml }: Props) {
@@ -179,6 +183,18 @@ export function SecurityPanel({ hasWorkspace, tools, report, baseline, scanning,
               />
               LLM-верификация находок (топ-10)
             </label>
+            <button
+              onClick={onToggleWatch}
+              className={`w-full text-[10px] py-1 rounded border transition-colors flex items-center justify-center ${
+                watching
+                  ? 'bg-green-600/20 border-green-500/40 text-green-400'
+                  : 'border-[#30363d] bg-[#161b22] text-gray-400 hover:border-green-500/40 hover:text-green-300'}`}
+              title="Watch-режим: авто-перескан при изменении файлов (SSE)"
+            >
+              {watching
+                ? `● Watch: слежу${lastWatchScan ? ` · скан ${lastWatchScan}` : ''}`
+                : '○ Watch-режим (авто-перескан при сохранении)'}
+            </button>
 
             {/* Baseline + SARIF */}
             <div className="flex space-x-1.5 pt-1">

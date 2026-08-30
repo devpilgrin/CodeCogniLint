@@ -78,6 +78,7 @@ export default function App() {
     scanning: securityScanning, busyBaseline: securityBusyBaseline, error: securityError,
     runScan: runSecurityScan, saveBaseline: saveSecurityBaseline,
     dropBaseline: dropSecurityBaseline, downloadSarif,
+    watching: securityWatching, lastWatchScan: securityLastWatchScan, toggleWatch: toggleSecurityWatch,
   } = useSecurity(workspace?.path ?? null);
   const {
     tools: pentestTools, report: pentestReport,
@@ -436,6 +437,9 @@ export default function App() {
           securityScanning={securityScanning}
           securityBusyBaseline={securityBusyBaseline}
           securityError={securityError}
+          securityWatching={securityWatching}
+          securityLastWatchScan={securityLastWatchScan}
+          onSecurityToggleWatch={toggleSecurityWatch}
           onSecurityScan={handleSecurityScan}
           onSecuritySaveBaseline={saveSecurityBaseline}
           onSecurityDropBaseline={dropSecurityBaseline}

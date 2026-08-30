@@ -185,3 +185,25 @@ def test_pr_branch_equals_base(client):
     client.post("/api/workspace/open", json={"path": "/home/roman/workspace/CodeCogniLint"})
     r = client.post("/api/git/pr", json={"title": "t", "base": "main"})
     assert r.status_code == 409
+
+
+def test_watch_stream_starts(client, workspace):
+    # smoke по генератору напрямую: поток бесконечный, TestClient-стрим висит
+    import asyncio
+    from services.watch_service import watch_events
+
+    async def first_event():
+        gen = watch_events(workspace)
+        try:
+            return await gen.__anext__()
+        finally:
+            await gen.aclose()
+
+    ev = asyncio.run(first_event())
+    assert "event: watch" in ev and '"status": "started"' in ev
+
+
+def test_watch_stream_no_workspace_404(client):
+    client.post("/api/workspace/close")
+    r = client.get("/api/watch/stream")
+    assert r.status_code == 404

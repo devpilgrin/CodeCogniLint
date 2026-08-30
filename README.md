@@ -187,6 +187,7 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/audit/run?verify=`        | Мульти-агентный аудит (суб-агенты + синтезатор + матрица) |
 | POST  | `/api/audit/html`               | HTML-рендер JSON-отчёта аудита |
 | GET   | `/api/quality/tools`            | Доступность движков качества (semgrep/radon) |
+| GET   | `/api/watch/stream`             | Watch: SSE авто-пересканов при изменении файлов |
 | POST  | `/api/quality/scan?review=`     | Качество: производительность + размер + best practices |
 | GET   | `/api/rules`                      | Все правила                               |
 | POST  | `/api/rules`                      | Создать вручную (без LLM)                 |
@@ -322,6 +323,7 @@ CodeCogniLint/
 - **Гейт качества в CI (ratchet)** — `.ccl-quality.yml` в корне проекта: пороги метрик + бюджеты находок; регресс (счётчик выше бюджета) роняет сборку; `ccl:ignore` учитывается
 - **Производительность сканов** — параллельный запуск независимых слоёв (semgrep/secrets/SCA, quality rules+metrics); SCA-кэш по хешу манифестов (повторный скан без изменений ~40x быстрее); манифесты ищутся рекурсивно (backend/requirements.txt, frontend/package-lock.json)
 - **Docker-дистрибуция** — multi-stage образ: frontend собирается и раздаётся FastAPI как статика; один контейнер = UI + API; CONTRIBUTING.md для участников
+- **Watch-режим** — авто-перескан при изменении файлов: SSE-поток `/api/watch/stream` (polling mtime, debounce, детерминированные слои без LLM), переключатель в панели Безопасность
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

@@ -171,6 +171,27 @@ def test_sca_no_manifests_no_cache(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------ SARIF
 
+def test_watch_snapshot_and_diff(tmp_path):
+    from services.watch_service import snapshot, diff_snapshots
+    import time
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    s1 = snapshot(tmp_path)
+    assert "a.py" in s1
+    assert diff_snapshots(s1, s1) == {"changed": [], "deleted": []}
+    time.sleep(0.01)
+    (tmp_path / "a.py").write_text("x = 2\n", encoding="utf-8")  # изменение
+    (tmp_path / "b.py").write_text("y = 1\n", encoding="utf-8")  # новый файл
+    s2 = snapshot(tmp_path)
+    d = diff_snapshots(s1, s2)
+    assert set(d["changed"]) == {"a.py", "b.py"} and d["deleted"] == []
+    s3 = dict(s2)
+    del s3["a.py"]
+    d = diff_snapshots(s2, s3)
+    assert d["deleted"] == ["a.py"]
+    # не-кодовые файлы не отслеживаются
+    (tmp_path / "notes.txt").write_text("t\n", encoding="utf-8")
+    assert "notes.txt" not in snapshot(tmp_path)
+
 def test_sarif_structure():
     report = {
         "findings": [{"rule_id": "py-sqli", "severity": "critical", "cwe": "CWE-89",

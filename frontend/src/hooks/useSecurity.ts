@@ -91,8 +91,34 @@ export function useSecurity(workspacePath: string | null) {
     setError(null);
   }, []);
 
+  // ---- Watch-режим: SSE-поток авто-пересканов при изменении файлов ----
+  const [watching, setWatching] = useState(false);
+  const [lastWatchScan, setLastWatchScan] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!watching || !workspacePath) return;
+    const es = new EventSource('/api/watch/stream');
+    es.addEventListener('rescan', (ev) => {
+      try {
+        const data = JSON.parse((ev as MessageEvent).data);
+        if (data.report) {
+          setReport(data.report);
+          setLastWatchScan(new Date().toLocaleTimeString('ru-RU'));
+        }
+      } catch { /* битый пакет — пропускаем */ }
+    });
+    es.addEventListener('error', () => {
+      setWatching(false);
+      es.close();
+    });
+    return () => es.close();
+  }, [watching, workspacePath]);
+
+  const toggleWatch = useCallback(() => setWatching(w => !w), []);
+
   return {
     tools, report, baseline, scanning, busyBaseline, error,
     runScan, saveBaseline, dropBaseline, downloadSarif, clearReport,
+    watching, lastWatchScan, toggleWatch,
   };
 }

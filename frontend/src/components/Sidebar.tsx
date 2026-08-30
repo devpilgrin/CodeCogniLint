@@ -33,6 +33,9 @@ interface Props {
   securityScanning: boolean;
   securityBusyBaseline: boolean;
   securityError: string | null;
+  securityWatching: boolean;
+  securityLastWatchScan: string | null;
+  onSecurityToggleWatch: () => void;
   onSecurityScan: (verify: boolean) => void;
   onSecuritySaveBaseline: () => void;
   onSecurityDropBaseline: () => void;
@@ -268,6 +271,9 @@ export function Sidebar(props: Props) {
         scanning={props.securityScanning}
         busyBaseline={props.securityBusyBaseline}
         error={props.securityError}
+        watching={props.securityWatching}
+        lastWatchScan={props.securityLastWatchScan}
+        onToggleWatch={props.onSecurityToggleWatch}
         onScan={props.onSecurityScan}
         onSaveBaseline={props.onSecuritySaveBaseline}
         onDropBaseline={props.onSecurityDropBaseline}
