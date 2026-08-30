@@ -6,6 +6,7 @@
 Все слои деградируют независимо: если инструмента нет — слой возвращает
 status "unavailable", отчёт собирается из доступных.
 """
+import asyncio
 import hashlib
 import json
 import os
@@ -221,6 +222,31 @@ def _scan_secrets_builtin(workspace: str) -> dict:
 
 # ---------------------------------------------------------------------- SCA
 
+SCA_CACHE_FILE = BACKEND_DIR / ".hybrid-sca-cache.json"
+
+
+def _load_sca_cache() -> dict:
+    try:
+        return json.loads(SCA_CACHE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_sca_cache(data: dict) -> None:
+    try:
+        SCA_CACHE_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _manifest_hash(paths: list[Path]) -> str:
+    h = hashlib.sha256()
+    for p in sorted(paths, key=str):
+        h.update(p.name.encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()[:16]
+
+
 def _scan_pip_audit(root: Path, req_files: list[Path], findings: list, notes: list) -> None:
     if shutil.which("pip-audit") is None:
         notes.append("pip-audit не установлен (pip install pip-audit)")
@@ -274,26 +300,82 @@ def _scan_npm_audit(root: Path, findings: list, notes: list) -> None:
         ))
 
 
+def _find_manifests(root: Path) -> tuple[dict[Path, list[Path]], list[Path]]:
+    """Манифесты зависимостей рекурсивно (без node_modules/.venv и т.п.):
+    {директория: [requirements*.txt]}, [package-lock.json...]"""
+    req_by_dir: dict[Path, list[Path]] = {}
+    locks: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        d = Path(dirpath)
+        reqs = [d / f for f in filenames if re.fullmatch(r"requirements.*\.txt", f)]
+        if reqs:
+            req_by_dir[d] = reqs
+        if "package-lock.json" in filenames:
+            locks.append(d / "package-lock.json")
+    return req_by_dir, locks
+
+
 def scan_sca(workspace: str) -> dict:
-    """SCA-скан: уязвимости зависимостей (pip-audit + npm audit)."""
+    """SCA-скан: уязвимости зависимостей (pip-audit + npm audit).
+
+    Манифесты ищутся рекурсивно (backend/requirements.txt, frontend/
+    package-lock.json и т.п.), каждый сканируется в своей директории.
+    Кэш по хешу манифестов: неизменённые манифесты не перепроверяются
+    (pip-audit/npm — самые медленные слои)."""
     root = Path(workspace).expanduser().resolve()
     findings: list = []
     notes: list = []
 
-    req_files = [f for f in root.glob("requirements*.txt")]
-    if req_files:
-        _scan_pip_audit(root, req_files, findings, notes)
+    cache = _load_sca_cache()
+    new_cache: dict = {}
+    cached_layers = 0
 
-    has_npm = (root / "package-lock.json").exists()
-    if has_npm:
-        _scan_npm_audit(root, findings, notes)
+    req_by_dir, locks = _find_manifests(root)
+    for d, req_files in req_by_dir.items():
+        key = "pip:" + str(d) + ":" + ",".join(f.name for f in req_files)
+        mh = _manifest_hash(req_files)
+        hit = cache.get(key)
+        if hit and hit.get("hash") == mh:
+            findings.extend(hit.get("findings", []))
+            notes.extend(hit.get("notes", []))
+            cached_layers += 1
+        else:
+            f_new, n_new = [], []
+            _scan_pip_audit(d, req_files, f_new, n_new)
+            findings.extend(f_new)
+            notes.extend(n_new)
+            new_cache[key] = {"hash": mh, "findings": f_new, "notes": n_new}
+
+    for lock in locks:
+        d = lock.parent
+        key = "npm:" + str(d)
+        mh = _manifest_hash([lock])
+        hit = cache.get(key)
+        if hit and hit.get("hash") == mh:
+            findings.extend(hit.get("findings", []))
+            notes.extend(hit.get("notes", []))
+            cached_layers += 1
+        else:
+            f_new, n_new = [], []
+            _scan_npm_audit(d, f_new, n_new)
+            findings.extend(f_new)
+            notes.extend(n_new)
+            new_cache[key] = {"hash": mh, "findings": f_new, "notes": n_new}
+
+    has_manifests = bool(req_by_dir or locks)
+    # кэш держим только для текущих ключей (устаревшие workspace вымываются)
+    if new_cache or cached_layers:
+        _save_sca_cache(new_cache)
+    if cached_layers:
+        notes.append(f"SCA-кэш: {cached_layers} слоёв без изменений (манифесты не менялись)")
 
     status = "ok" if findings or not notes else "partial"
-    out = {"status": status if (findings or req_files or has_npm) else "ok",
+    out = {"status": status if (findings or has_manifests) else "ok",
            "findings": findings}
     if notes:
         out["note"] = "; ".join(notes)
-    if not req_files and not has_npm:
+    if not has_manifests:
         out["note"] = (out.get("note", "") + "; " if out.get("note") else "") + \
             "манифесты зависимостей не найдены"
     return out
@@ -593,9 +675,12 @@ def to_sarif(report: dict) -> dict:
 # -------------------------------------------------------------------- Отчёт
 
 async def scan_workspace(workspace: str, verify: bool = False) -> dict:
-    semgrep_res = scan_semgrep(workspace)
-    secrets_res = scan_secrets(workspace)
-    sca_res = scan_sca(workspace)
+    # Независимые инструменты — параллельно (subprocess освобождает GIL)
+    semgrep_res, secrets_res, sca_res = await asyncio.gather(
+        asyncio.to_thread(scan_semgrep, workspace),
+        asyncio.to_thread(scan_secrets, workspace),
+        asyncio.to_thread(scan_sca, workspace),
+    )
 
     all_findings = semgrep_res["findings"] + secrets_res["findings"] + sca_res["findings"]
     all_findings = _apply_suppression(workspace, all_findings)

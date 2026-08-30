@@ -139,6 +139,36 @@ def test_pentest_headers_helper():
     assert not ok
 
 
+# ------------------------------------------------------------------ SCA-кэш
+
+def test_sca_cache_hit_skips_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(sec, "SCA_CACHE_FILE", tmp_path / "sca-cache.json")
+    (tmp_path / "requirements.txt").write_text("flask==2.0.0\n", encoding="utf-8")
+
+    calls = {"n": 0}
+    def fake_pip(root, req_files, findings, notes):
+        calls["n"] += 1
+        findings.append({"rule_id": "CVE-X", "path": "requirements.txt", "severity": "critical"})
+    monkeypatch.setattr(sec, "_scan_pip_audit", fake_pip)
+
+    r1 = sec.scan_sca(str(tmp_path))
+    assert calls["n"] == 1 and len(r1["findings"]) == 1
+    r2 = sec.scan_sca(str(tmp_path))
+    assert calls["n"] == 1, "повторный скан не должен вызывать pip-audit"
+    assert len(r2["findings"]) == 1 and "кэш" in r2.get("note", "")
+    # манифест изменился → кэш инвалидирован
+    (tmp_path / "requirements.txt").write_text("flask==2.3.0\n", encoding="utf-8")
+    sec.scan_sca(str(tmp_path))
+    assert calls["n"] == 2
+
+
+def test_sca_no_manifests_no_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(sec, "SCA_CACHE_FILE", tmp_path / "sca-cache.json")
+    r = sec.scan_sca(str(tmp_path))
+    assert "манифесты зависимостей не найдены" in r.get("note", "")
+    assert not (tmp_path / "sca-cache.json").exists()
+
+
 # ------------------------------------------------------------------ гейт качества
 
 def test_gate_config_defaults_without_file(tmp_path):

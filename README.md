@@ -310,6 +310,7 @@ CodeCogniLint/
 - **Качество кода** — отдельный слой: semgrep-паттерны производительности и best practices (python/js/ts), метрики размера (LOC, длина функций, цикломатическая сложность через radon), рейтинг hotspot'ов, опциональный LLM-разбор топ-hotspot'ов
 - **Тестовый контур** — pytest: unit-тесты сервисов (suppression/baseline/fingerprint, санитайзеры отчётов, валидация настроек, метрики качества) + smoke-эндпоинтов через TestClient; прогон в CI
 - **Гейт качества в CI (ratchet)** — `.ccl-quality.yml` в корне проекта: пороги метрик + бюджеты находок; регресс (счётчик выше бюджета) роняет сборку; `ccl:ignore` учитывается
+- **Производительность сканов** — параллельный запуск независимых слоёв (semgrep/secrets/SCA, quality rules+metrics); SCA-кэш по хешу манифестов (повторный скан без изменений ~40x быстрее); манифесты ищутся рекурсивно (backend/requirements.txt, frontend/package-lock.json)
 - Security-gate в CI (semgrep + pip-audit, зависимости без известных CVE)
 - Чат с LLM (с контекстом файла)
 - Multi-LLM (LM Studio / OpenAI / Anthropic)

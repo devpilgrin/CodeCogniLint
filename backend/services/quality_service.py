@@ -268,10 +268,13 @@ async def _review_hotspots(workspace: str, hotspots: list[dict], metrics: dict) 
 
 async def scan_quality(workspace: str, review: bool = False) -> dict:
     gate_cfg = load_gate_config(workspace)
-    rules = await asyncio.to_thread(scan_quality_rules, workspace)
+    # независимые слои — параллельно
+    rules, metrics = await asyncio.gather(
+        asyncio.to_thread(scan_quality_rules, workspace),
+        asyncio.to_thread(collect_metrics, workspace, gate_cfg["thresholds"]),
+    )
     findings = rules["findings"]
     findings = _apply_suppression(workspace, findings)  # ccl:ignore работает и здесь
-    metrics = await asyncio.to_thread(collect_metrics, workspace, gate_cfg["thresholds"])
     hotspots = _rank_hotspots(metrics, findings)
     reviewed = await _review_hotspots(workspace, hotspots, metrics) if review and hotspots else None
 
