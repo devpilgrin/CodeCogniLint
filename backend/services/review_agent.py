@@ -203,3 +203,59 @@ async def review_changes(workspace: str) -> dict:
         ),
         "files": reviews,
     }
+
+
+async def review_commit(workspace: str, sha: str) -> dict:
+    """
+    Ревью конкретного коммита: per-file ревью с diff-контекстом коммита.
+    Контент файлов — версия на этом коммите; фокус — изменённые строки.
+    """
+    from .git_service import commit_show, file_at
+
+    meta = commit_show(workspace, sha)
+    files = meta["files"][:MAX_CHANGES_FILES]
+
+    if not files:
+        return {
+            "overall_verdict": "approve",
+            "summary": f"Коммит {meta['short']}: «{meta['subject']}» — кодовых файлов нет, ревью не требуется.",
+            "commit": {k: meta[k] for k in ("sha", "short", "author", "subject", "date")},
+            "files": [],
+        }
+
+    reviews = []
+    for path in files:
+        content = file_at(workspace, meta["sha"], path)
+        if content is None:
+            continue
+        # per-file diff коммита как фокус ревью
+        try:
+            from .git_service import _repo
+            file_diff = _repo(workspace).git.show(meta["sha"], "--format=", f"--", path)
+        except GitError:
+            file_diff = ""
+        reviews.append(await review_file(path, content, change_context=file_diff or None))
+
+    if not reviews:
+        return {
+            "overall_verdict": "comment",
+            "summary": f"Коммит {meta['short']}: файлы не удалось прочитать (бинарные или слишком большие).",
+            "commit": {k: meta[k] for k in ("sha", "short", "author", "subject", "date")},
+            "files": [],
+        }
+
+    rank = {"request_changes": 2, "comment": 1, "approve": 0}
+    overall = max((r["verdict"] for r in reviews), key=lambda v: rank[v])
+    total_issues = sum(len(r["issues"]) for r in reviews)
+    critical = sum(1 for r in reviews for i in r["issues"] if i["severity"] == "critical")
+
+    return {
+        "overall_verdict": overall,
+        "summary": (
+            f"Коммит {meta['short']} «{meta['subject']}» ({meta['author']}): "
+            f"ревью {len(reviews)} файлов, замечаний {total_issues}"
+            + (f", из них критичных {critical}." if critical else ".")
+        ),
+        "commit": {k: meta[k] for k in ("sha", "short", "author", "subject", "date")},
+        "files": reviews,
+    }

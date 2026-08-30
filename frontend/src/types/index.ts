@@ -148,6 +148,40 @@ export interface PrResult {
   created: boolean;  // false = PR уже существовал
 }
 
+// ---- Анализ коммита и сравнение веток ----
+export interface BranchList {
+  current: string | null;
+  branches: string[];
+}
+
+export interface CompareFinding {
+  rule_id: string;
+  severity: 'critical' | 'warning' | 'info';
+  path: string;
+  line_start: number;
+  title: string;
+  tool: string;
+}
+
+export interface CompareResult {
+  base: string;
+  head: string;
+  changed_files: string[];
+  added: CompareFinding[];
+  removed: CompareFinding[];
+  summary: {
+    added: number;
+    removed: number;
+    added_by_severity: Record<string, number>;
+    removed_by_severity: Record<string, number>;
+  };
+  note: string | null;
+}
+
+export interface CommitReviewResult extends ChangesReviewResult {
+  commit: { sha: string; short: string; author: string; subject: string; date: string } | null;
+}
+
 // ---- Качество кода (производительность / размер / best practices) ----
 export interface QualityFinding {
   id: string;

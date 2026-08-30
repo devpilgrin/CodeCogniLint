@@ -187,7 +187,7 @@ export function ReviewTab({
           />
         )}
 
-        {!error && state.mode === 'changes' && state.changes && (
+        {!error && (state.mode === 'changes' || state.mode === 'commit') && state.changes && (
           <div className="space-y-3">
             <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${verdictStyle[state.changes.overall_verdict]}`}>
               {t(`verdict.${state.changes.overall_verdict}`)}

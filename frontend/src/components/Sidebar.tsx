@@ -20,6 +20,7 @@ interface Props {
   resultsByFile: Record<string, AnalysisResult>;
   backendOnline: boolean;
   onFileOpen: (path: string) => void;
+  onReviewCommit: (sha: string) => void;
   onOpenPicker: () => void;
   onCloseWorkspace: () => void;
   rules: Rule[];
@@ -179,7 +180,7 @@ export function Sidebar(props: Props) {
   const { t } = useI18n();
   const {
     panel, workspace, tree, activeFile, resultsByFile, backendOnline,
-    onFileOpen, onOpenPicker, onCloseWorkspace,
+    onFileOpen, onReviewCommit, onOpenPicker, onCloseWorkspace,
     rules, onDeleteRule, onToggleRule, onCreateRuleManually, onEditRule,
   } = props;
 
@@ -274,7 +275,7 @@ export function Sidebar(props: Props) {
   }
 
   if (panel === 'git') {
-    return <GitPanel workspace={workspace} onFileOpen={onFileOpen} />;
+    return <GitPanel workspace={workspace} onFileOpen={onFileOpen} onReviewCommit={onReviewCommit} />;
   }
 
   if (panel === 'security') {

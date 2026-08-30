@@ -73,7 +73,7 @@ export default function App() {
   } = useWorkspace();
   const {
     reviewing, state: reviewState, error: reviewError,
-    runFileReview, runChangesReview, clearReview,
+    runFileReview, runChangesReview, runCommitReview, clearReview,
   } = useReview();
   const {
     tools: securityTools, report: securityReport, baseline: securityBaseline,
@@ -275,6 +275,12 @@ export default function App() {
     runChangesReview();
   }, [workspace, runChangesReview]);
 
+  /** Ревью конкретного коммита: открывает вкладку Ревью и запускает LLM-анализ. */
+  const handleReviewCommit = useCallback((sha: string) => {
+    setAiView('review');
+    runCommitReview(sha);
+  }, [runCommitReview]);
+
   // ---- Security scan ----
   const handleSecurityScan = useCallback((verify: boolean) => {
     if (!workspace) return;
@@ -426,6 +432,7 @@ export default function App() {
           resultsByFile={resultsByFile}
           backendOnline={backendOnline}
           onFileOpen={openFile}
+          onReviewCommit={handleReviewCommit}
           onOpenPicker={() => setPickerOpen(true)}
           onCloseWorkspace={handleCloseWorkspace}
           rules={rules}

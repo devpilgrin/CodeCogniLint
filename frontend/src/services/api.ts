@@ -2,9 +2,10 @@ import axios from 'axios';
 import type {
   Rule, AnalysisResult, ChatMessage, LLMSettings,
   WorkspaceState, TreeNode, FileContentResponse, BrowseResponse,
-  GitStatus, GitLogEntry, GitCommitResult, GitPushResult, GitPullResult,
-  ReviewResult, ChangesReviewResult, SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, PrResult,
-  QualityReport,
+  GitStatus, GitCommitResult, GitPushResult, GitPullResult, GitLogEntry, PrResult,
+  BranchList, CompareResult,
+  ReviewResult, ChangesReviewResult, CommitReviewResult,
+  SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, QualityReport,
 } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
@@ -74,6 +75,7 @@ export const gitApi = {
     api.get<{ commits: GitLogEntry[] }>('/git/log', { params: { limit } }).then(r => r.data.commits),
   createPr: (title: string, body: string, base: string, withLlm: boolean) =>
     api.post<PrResult>('/git/pr', { title, body, base, with_llm: withLlm }).then(r => r.data),
+  branches: () => api.get<BranchList>('/git/branches').then(r => r.data),
 };
 
 export const reviewApi = {
@@ -81,6 +83,13 @@ export const reviewApi = {
     api.post<ReviewResult>('/review/file', { file_path: filePath, content }).then(r => r.data),
   reviewChanges: () =>
     api.post<ChangesReviewResult>('/review/changes').then(r => r.data),
+  reviewCommit: (sha: string) =>
+    api.post<CommitReviewResult>('/review/commit', { sha }).then(r => r.data),
+};
+
+export const compareApi = {
+  run: (base: string, head: string) =>
+    api.get<CompareResult>('/analysis/compare', { params: { base, head } }).then(r => r.data),
 };
 
 export const securityApi = {

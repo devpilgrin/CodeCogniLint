@@ -202,7 +202,10 @@ The backend runs at `http://localhost:8000`, Swagger at `/docs`.
 | POST  | `/api/pentest/scan`               | Pentest a live application (config/fuzz/nuclei + LLM interpretation) |
 | POST  | `/api/audit/run?verify=`          | Multi-agent audit (sub-agents + synthesizer + matrix) |
 | POST  | `/api/audit/html`                 | HTML rendering of the JSON audit report   |
-| GET   | `/api/quality/tools`              | Quality engine availability (semgrep/radon) |
+| POST  | `/api/review/commit`            | Commit review (git show diff + LLM) |
+| GET   | `/api/git/branches`             | Local workspace branches |
+| GET   | `/api/analysis/compare`         | Violation diff between branches (semgrep-diff) |
+| GET   | `/api/quality/tools`            | Quality engine availability (semgrep/radon) |
 | GET   | `/api/watch/stream`               | Watch: SSE auto-rescans on file changes   |
 | POST  | `/api/quality/scan?review=`       | Quality: performance + size + best practices |
 | GET   | `/api/rules`                      | All rules                                 |

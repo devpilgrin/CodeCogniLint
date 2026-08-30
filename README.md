@@ -202,6 +202,9 @@ LLM_API_KEY=lm-studio
 | POST  | `/api/pentest/scan`               | Пентест живого приложения (config/fuzz/nuclei + LLM-интерпретация) |
 | POST  | `/api/audit/run?verify=`        | Мульти-агентный аудит (суб-агенты + синтезатор + матрица) |
 | POST  | `/api/audit/html`               | HTML-рендер JSON-отчёта аудита |
+| POST  | `/api/review/commit`            | Ревью коммита (git show diff + LLM) |
+| GET   | `/api/git/branches`             | Локальные ветки workspace |
+| GET   | `/api/analysis/compare`         | Сравнение нарушений между ветками (semgrep-diff) |
 | GET   | `/api/quality/tools`            | Доступность движков качества (semgrep/radon) |
 | GET   | `/api/watch/stream`             | Watch: SSE авто-пересканов при изменении файлов |
 | POST  | `/api/quality/scan?review=`     | Качество: производительность + размер + best practices |
@@ -373,7 +376,9 @@ CodeCogniLint/
 - Пентест (DAST): config-checks, фаззинг API по OpenAPI, LLM-интерпретация риска
 - Мульти-агентный аудит: суб-агенты по доменам + синтезатор + матрица рисков (CWE)
 - API-гигиена: security-заголовки, документированные коды/типы ответов, устойчивость к фаззингу (собственный пентест: 35 → 0 дефектов корректности)
-- PR-интеграция: создание GitHub PR и GitLab MR из UI (push + API, хост по remote), LLM-генерация заголовка/описания по diff
+- **PR-интеграция** — создание GitHub PR и GitLab MR из UI (push + API, хост по remote), LLM-генерация заголовка/описания по diff
+- **Ревью коммита** — кнопка у коммита в истории: `git show` diff + LLM-ревьюер (per-file, фокус на изменённых строках), вердикт approve/comment/request_changes
+- **Сравнение веток** — детерминированный diff нарушений между ref'ами: semgrep (security+quality) на git worktree базовой и целевой ветки, сравнение по fingerprint только в изменённых файлах, без LLM
 - HTML-экспорт отчёта аудита (детерминированный рендер)
 - Настройки LLM: валидация до записи + атомарная перезапись .env
 - **Качество кода** — отдельный слой: semgrep-паттерны производительности и best practices (python/js/ts), метрики размера (LOC, длина функций, цикломатическая сложность через radon), рейтинг hotspot'ов, опциональный LLM-разбор топ-hotspot'ов
@@ -388,5 +393,4 @@ CodeCogniLint/
 - Multi-LLM (LM Studio / OpenAI / Anthropic)
 
 **В разработке:**
-- Анализ конкретного коммита (`git diff` + LLM-комментарии)
-- Сравнение нарушений между ветками
+- Авто-фикс находок (apply patch из LLM-рекомендаций)

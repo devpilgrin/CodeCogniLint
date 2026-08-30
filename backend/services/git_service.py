@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Optional
 
 import git
+from git.exc import GitCommandError
+from gitdb.exc import BadName
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -248,6 +250,67 @@ def log(workspace: str, limit: int = 10) -> dict:
         })
     return {"commits": commits}
 
+
+# ---- Анализ коммита и сравнение веток ----
+
+_CODE_EXT_FOR_DIFF = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs",
+                      ".c", ".cpp", ".h", ".cs", ".php", ".rb", ".vue", ".svelte"}
+
+
+def commit_show(workspace: str, sha: str) -> dict:
+    """Метаданные коммита + unified diff (обрезан для LLM)."""
+    repo = _repo(workspace)
+    try:
+        c = repo.commit(sha)
+    except (ValueError, GitCommandError, BadName) as e:
+        raise GitError(f"Коммит не найден: {sha} ({e})")
+    files = [p for p in c.stats.files.keys()
+             if Path(p).suffix.lower() in _CODE_EXT_FOR_DIFF]
+    try:
+        full_diff = repo.git.show(sha, "--format=", "--unified=40")
+    except GitCommandError as e:
+        raise GitError(f"git show: {e}")
+    return {
+        "sha": c.hexsha,
+        "short": c.hexsha[:7],
+        "author": str(c.author),
+        "subject": c.message.strip().splitlines()[0] if c.message else "",
+        "date": c.committed_datetime.isoformat(),
+        "files": files,
+        "diff": full_diff[:30000],
+    }
+
+
+def file_at(workspace: str, ref: str, path: str) -> Optional[str]:
+    """Содержимое файла на указанном ref (ветка/коммит). None если нет."""
+    repo = _repo(workspace)
+    try:
+        return repo.git.show(f"{ref}:{path}")
+    except GitCommandError:
+        return None
+
+
+def branches(workspace: str) -> dict:
+    """Локальные ветки + текущая."""
+    repo = _repo(workspace)
+    if not repo.head.is_valid():
+        return {"current": None, "branches": []}
+    try:
+        current = repo.active_branch.name
+    except TypeError:
+        current = None
+    return {"current": current, "branches": sorted(b.name for b in repo.branches)}
+
+
+def changed_files(workspace: str, base: str, head: str = "HEAD") -> list[str]:
+    """Изменённые кодовые файлы между ref'ами (git diff --name-only base head)."""
+    repo = _repo(workspace)
+    try:
+        out = repo.git.diff(base, head, name_only=True)
+    except GitCommandError as e:
+        raise GitError(f"git diff {base}..{head}: {e}")
+    return sorted(p for p in out.splitlines()
+                  if Path(p).suffix.lower() in _CODE_EXT_FOR_DIFF)
 
 # ---- PR/MR-интеграция ----
 

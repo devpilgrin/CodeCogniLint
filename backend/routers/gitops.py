@@ -73,6 +73,19 @@ def git_pull(body: PullRequest):
         raise _git_error(e)
 
 
+@router.get("/branches")
+def git_branches():
+    """Локальные ветки workspace (для сравнения)."""
+    ws = get_workspace()
+    if not ws["current"]:
+        raise HTTPException(status_code=404, detail="Проект не открыт")
+    from services.git_service import branches
+    try:
+        return branches(ws["current"]["path"])
+    except GitError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @router.get("/log")
 def git_log(limit: int = Query(10, ge=1, le=50)):
     try:

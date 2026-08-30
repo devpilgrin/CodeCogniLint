@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
-import { gitApi } from '../services/api';
+import { gitApi, compareApi } from '../services/api';
 import { useI18n } from '../i18n';
-import type { GitStatus, GitLogEntry, PrResult } from '../types';
+import type { GitStatus, GitLogEntry, PrResult, CompareResult } from '../types';
 
-export type GitOp = 'refresh' | 'commit' | 'push' | 'pull' | 'pr' | null;
+export type GitOp = 'refresh' | 'commit' | 'push' | 'pull' | 'pr' | 'compare' | null;
 
 export interface GitNotice {
   kind: 'ok' | 'err';
@@ -25,6 +25,8 @@ export function useGit(workspacePath: string | null) {
   const { t } = useI18n();
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [commits, setCommits] = useState<GitLogEntry[]>([]);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [notRepo, setNotRepo] = useState(false);
   const [busy, setBusy] = useState<GitOp>(null);
   const [notice, setNotice] = useState<GitNotice | null>(null);
@@ -33,9 +35,10 @@ export function useGit(workspacePath: string | null) {
     if (!workspacePath) return;
     setBusy(b => b ?? 'refresh');
     try {
-      const [st, log] = await Promise.all([gitApi.status(), gitApi.log(8)]);
+      const [st, log, br] = await Promise.all([gitApi.status(), gitApi.log(8), gitApi.branches()]);
       setStatus(st);
       setCommits(log);
+      setBranches(br.branches);
       setNotRepo(false);
     } catch (e) {
       const msg = errText(e, t('err.backendOfflineShort'));
@@ -131,5 +134,16 @@ export function useGit(workspacePath: string | null) {
     }
   }, [refresh, t]);
 
-  return { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr };
+  const doCompare = useCallback(async (base: string, head: string) => {
+    setBusy('compare');
+    try {
+      setCompareResult(await compareApi.run(base, head));
+    } catch (e) {
+      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+    } finally {
+      setBusy(null);
+    }
+  }, [t]);
+
+  return { status, commits, branches, compareResult, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr, doCompare };
 }

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from services.analysis_service import analyze_code
 from services.llm_adapter import chat_completion, LLMError
 from services.workspace_service import get_workspace, iter_workspace_files
+from services.git_service import GitError
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -47,6 +48,20 @@ class ChatRequest(BaseModel):
 @router.post("/file")
 async def analyze_file(body: FileAnalysisRequest):
     return await analyze_code(body.file_path, body.content)
+
+
+@router.get("/compare")
+async def compare_refs(base: str = "main", head: str = "HEAD"):
+    """Сравнение нарушений между ветками: semgrep-находки по изменённым файлам,
+    diff по fingerprint. Детерминированно, без LLM."""
+    ws = get_workspace()
+    if not ws["current"]:
+        raise HTTPException(status_code=404, detail="Проект не открыт")
+    from services.compare_service import compare_branches
+    try:
+        return await compare_branches(ws["current"]["path"], base, head)
+    except GitError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/repository/stream", responses={

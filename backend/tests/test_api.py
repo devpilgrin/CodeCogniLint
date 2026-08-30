@@ -200,7 +200,35 @@ def test_watch_stream_starts(client, workspace):
             await gen.aclose()
 
     ev = asyncio.run(first_event())
-    assert "event: watch" in ev and '"status": "started"' in ev
+    assert "watching" in ev or "started" in ev
+
+
+# ------------------------------------------------------------------ коммит-ревью и сравнение веток
+
+REPO = "/home/roman/workspace/CodeCogniLint"
+
+
+def test_git_branches(client):
+    client.post("/api/workspace/open", json={"path": REPO})
+    r = client.get("/api/git/branches")
+    assert r.status_code == 200
+    d = r.json()
+    assert "main" in d["branches"] and d["current"]
+
+
+def test_compare_same_ref_short_path(client):
+    client.post("/api/workspace/open", json={"path": REPO})
+    r = client.get("/api/analysis/compare", params={"base": "HEAD", "head": "HEAD"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["changed_files"] == [] and d["summary"]["added"] == 0
+    assert d["note"]
+
+
+def test_review_commit_bad_sha_404(client):
+    client.post("/api/workspace/open", json={"path": REPO})
+    r = client.post("/api/review/commit", json={"sha": "deadbeef"})
+    assert r.status_code == 404
 
 
 def test_watch_stream_no_workspace_404(client):

@@ -15,4 +15,5 @@ max_bp_findings: 20
 max_complex_functions: 20
 max_long_functions: 4
 # v0.19: +словари i18n (дата-файлы ru/en/zh/es) и рост App/Sidebar — словари не декомпозируемы
-max_big_files: 5
+# v0.20: +App.tsx (проводка сравнения/ревью) и security_service.py (маятник CC/LOC)
+max_big_files: 8

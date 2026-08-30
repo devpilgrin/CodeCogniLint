@@ -4,7 +4,7 @@ import { reviewApi } from '../services/api';
 import type { ReviewResult, ChangesReviewResult } from '../types';
 import { useI18n } from '../i18n';
 
-export type ReviewMode = 'file' | 'changes';
+export type ReviewMode = 'file' | 'changes' | 'commit';
 
 export interface ReviewState {
   mode: ReviewMode;
@@ -54,10 +54,23 @@ export function useReview() {
     }
   }, []);
 
+  const runCommitReview = useCallback(async (sha: string) => {
+    setReviewing('commit');
+    setError(null);
+    try {
+      const result = await reviewApi.reviewCommit(sha);
+      setState({ mode: 'commit', file: null, changes: result });
+    } catch (e) {
+      setError(errText(e, t('err.backendOfflineShort')));
+    } finally {
+      setReviewing(null);
+    }
+  }, [t]);
+
   const clearReview = useCallback(() => {
     setState({ mode: 'file', file: null, changes: null });
     setError(null);
   }, []);
 
-  return { reviewing, state, error, runFileReview, runChangesReview, clearReview };
+  return { reviewing, state, error, runFileReview, runChangesReview, runCommitReview, clearReview };
 }

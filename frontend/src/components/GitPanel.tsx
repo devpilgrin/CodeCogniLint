@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCodeBranch, faRotate, faArrowUp, faArrowDown,
   faCloudArrowUp, faCloudArrowDown, faFolderOpen, faTriangleExclamation,
-  faCodePullRequest, faArrowUpRightFromSquare,
+  faCodePullRequest, faArrowUpRightFromSquare, faClipboardCheck, faCodeCompare,
 } from '@fortawesome/free-solid-svg-icons';
 import type { WorkspaceInfo, GitChangedFile, PrResult } from '../types';
 import { useGit } from '../hooks/useGit';
@@ -12,6 +12,7 @@ import { useI18n } from '../i18n';
 interface Props {
   workspace: WorkspaceInfo | null;
   onFileOpen: (path: string) => void;
+  onReviewCommit: (sha: string) => void;
 }
 
 const statusStyle: Record<GitChangedFile['status'], string> = {
@@ -22,9 +23,9 @@ const statusStyle: Record<GitChangedFile['status'], string> = {
   '?': 'text-blue-400',
 };
 
-export function GitPanel({ workspace, onFileOpen }: Props) {
+export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
   const { t } = useI18n();
-  const { status, commits, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr } =
+  const { status, commits, branches, compareResult, notRepo, busy, notice, refresh, doCommit, doPush, doPull, doCreatePr, doCompare } =
     useGit(workspace?.path ?? null);
   const [message, setMessage] = useState('');
   const [prOpen, setPrOpen] = useState(false);
@@ -33,6 +34,8 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
   const [prBase, setPrBase] = useState('main');
   const [prLlm, setPrLlm] = useState(true);
   const [prResult, setPrResult] = useState<PrResult | null>(null);
+  const [cmpBase, setCmpBase] = useState('');
+  const [cmpHead, setCmpHead] = useState('HEAD');
 
   const statusTitle: Record<GitChangedFile['status'], string> = {
     M: t('git.statusModified'),
@@ -257,16 +260,89 @@ export function GitPanel({ workspace, onFileOpen }: Props) {
                 {t('git.history')}
               </div>
               {commits.map(c => (
-                <div key={c.hash} className="px-3 py-1.5 border-b border-[#21262d]">
+                <div key={c.hash} className="px-3 py-1.5 border-b border-[#21262d] group">
                   <div className="flex items-center text-[11px]">
                     <span className="text-blue-400 code-font mr-2 flex-shrink-0">{c.hash}</span>
-                    <span className="text-gray-300 truncate" title={c.message}>{c.message}</span>
+                    <span className="text-gray-300 truncate flex-1" title={c.message}>{c.message}</span>
+                    <button
+                      onClick={() => onReviewCommit(c.hash)}
+                      disabled={busy !== null}
+                      className="ml-1.5 text-gray-600 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      title={t('git.reviewCommitTitle')}
+                    >
+                      <FontAwesomeIcon icon={faClipboardCheck} className="text-[10px]" />
+                    </button>
                   </div>
                   <div className="text-[9px] text-gray-600 mt-0.5">
                     {c.author} · {new Date(c.date).toLocaleString('ru-RU')}
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Сравнение веток */}
+          {branches.length > 0 && (
+            <div className="mt-3 border-t border-[#30363d] px-3 py-2 space-y-1.5">
+              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider flex items-center">
+                <FontAwesomeIcon icon={faCodeCompare} className="mr-1" />
+                {t('git.compareTitle')}
+              </div>
+              <div className="flex space-x-1">
+                <select
+                  value={cmpBase}
+                  onChange={e => setCmpBase(e.target.value)}
+                  className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-1 text-[10px] text-gray-300 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">{t('git.compareBase')}</option>
+                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <select
+                  value={cmpHead}
+                  onChange={e => setCmpHead(e.target.value)}
+                  className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-1 text-[10px] text-gray-300 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="HEAD">HEAD ({t('git.compareHeadCurrent')})</option>
+                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <button
+                onClick={() => cmpBase && doCompare(cmpBase, cmpHead)}
+                disabled={!cmpBase || busy !== null}
+                className="w-full text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40"
+              >
+                {busy === 'compare' ? t('git.compareRunning') : t('git.compareRun')}
+              </button>
+              {compareResult && (
+                <div className="text-[10px] space-y-1 pt-1">
+                  {compareResult.note ? (
+                    <p className="text-gray-500">{t('git.compareNoChanges')}</p>
+                  ) : (
+                    <>
+                      <p className="text-gray-400">
+                        {compareResult.base} → {compareResult.head}:&nbsp;
+                        <span className={compareResult.summary.added > 0 ? 'text-red-400 font-bold' : 'text-gray-500'}>
+                          {t('git.compareAdded', { count: compareResult.summary.added })}
+                        </span>{' · '}
+                        <span className={compareResult.summary.removed > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}>
+                          {t('git.compareRemoved', { count: compareResult.summary.removed })}
+                        </span>
+                      </p>
+                      {compareResult.added.slice(0, 8).map((f, i) => (
+                        <button
+                          key={i}
+                          onClick={() => onFileOpen(f.path)}
+                          className="w-full text-left text-[10px] text-gray-400 hover:text-red-300 transition-colors truncate"
+                          title={f.title}
+                        >
+                          <span className={`mr-1 font-bold ${f.severity === 'critical' ? 'text-red-400' : f.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'}`}>+</span>
+                          {f.path}:{f.line_start} — {f.title}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

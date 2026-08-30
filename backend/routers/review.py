@@ -28,3 +28,20 @@ async def review_uncommitted_changes():
         return await review_changes(ws["current"]["path"])
     except GitError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+class CommitReviewRequest(BaseModel):
+    sha: str = Field(min_length=4, max_length=64)
+
+
+@router.post("/commit")
+async def review_single_commit(body: CommitReviewRequest):
+    """Ревью конкретного коммита: git show diff + LLM-ревьюер."""
+    ws = get_workspace()
+    if not ws["current"]:
+        raise HTTPException(status_code=404, detail="Проект не открыт")
+    from services.review_agent import review_commit
+    try:
+        return await review_commit(ws["current"]["path"], body.sha)
+    except GitError as e:
+        raise HTTPException(status_code=404, detail=str(e))
