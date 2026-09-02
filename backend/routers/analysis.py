@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -31,18 +31,19 @@ def _normalize_for_llm(messages: list[dict]) -> list[dict]:
 
 class FileAnalysisRequest(BaseModel):
     file_path: str = Field(min_length=1)
-    content: str = Field(min_length=1)
+    # Лимит тела: большой файл не должен класть LLM-контекст и память
+    content: str = Field(min_length=1, max_length=512_000)
 
 
 class ChatMessageIn(BaseModel):
     role: str = Field(pattern="^(user|assistant|system)$")
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=64_000)
     timestamp: str | None = None
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessageIn]
-    context: str | None = None
+    messages: list[ChatMessageIn] = Field(max_length=100)
+    context: str | None = Field(default=None, max_length=512_000)
 
 
 @router.post("/file")
@@ -154,7 +155,7 @@ async def chat(body: ChatRequest):
         return {
             "role": "assistant",
             "content": "Сообщение пустое — сформулируйте вопрос о коде.",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     llm_messages = [{"role": "system", "content": system}] + history
@@ -167,5 +168,5 @@ async def chat(body: ChatRequest):
     return {
         "role": "assistant",
         "content": reply,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }

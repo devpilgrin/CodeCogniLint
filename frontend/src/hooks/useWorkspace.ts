@@ -1,18 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import type { WorkspaceInfo, TreeNode, FileContentResponse } from '../types';
-import { workspaceApi } from '../services/api';
+import { workspaceApi, apiErrorMessage } from '../services/api';
 import { useI18n } from '../i18n';
-
-function errMsg(err: unknown, fallback: string, offline: string): string {
-  if (axios.isAxiosError(err) && err.response?.data?.detail) {
-    return String(err.response.data.detail);
-  }
-  if (axios.isAxiosError(err) && err.code === 'ERR_NETWORK') {
-    return offline;
-  }
-  return fallback;
-}
 
 export function useWorkspace() {
   const { t } = useI18n();
@@ -59,7 +48,7 @@ export function useWorkspace() {
       await loadTree();
       return true;
     } catch (err) {
-      setError(errMsg(err, t('err.openProject'), t('err.backendOfflineDetail')));
+      setError(apiErrorMessage(err, t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -75,7 +64,7 @@ export function useWorkspace() {
       await loadTree();
       return true;
     } catch (err) {
-      setError(errMsg(err, t('err.cloneRepo'), t('err.backendOfflineDetail')));
+      setError(apiErrorMessage(err, t('err.backendOfflineDetail')));
       return false;
     } finally {
       setLoading(false);
@@ -95,7 +84,7 @@ export function useWorkspace() {
     try {
       return await workspaceApi.getFile(path);
     } catch (err) {
-      setError(errMsg(err, t('err.readFile'), t('err.backendOfflineDetail')));
+      setError(apiErrorMessage(err, t('err.backendOfflineDetail')));
       return null;
     }
   }, []);
@@ -105,7 +94,7 @@ export function useWorkspace() {
       await workspaceApi.saveFile(path, content);
       return null;
     } catch (err) {
-      return errMsg(err, t('err.saveFile'), t('err.backendOfflineDetail'));
+      return apiErrorMessage(err, t('err.backendOfflineDetail'));
     }
   }, []);
 

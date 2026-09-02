@@ -44,6 +44,7 @@ export const es: Record<string, string> = {
   'common.delete': 'Eliminar',
   'common.edit': 'Editar',
   'common.create': 'Crear',
+  'common.confirm': 'Confirmar',
 
   'ai.insights': 'Insights de IA',
   'ai.resetFile': 'Restablecer resultados del archivo actual',
@@ -71,6 +72,7 @@ export const es: Record<string, string> = {
   'ai.line': 'línea {line}',
   'ai.askFix': 'Preguntar al LLM sobre la corrección →',
   'ai.context': 'Contexto',
+  'ai.comingSoon': 'Pronto',
   'ai.chatPlaceholder': 'Preguntar a la IA sobre el código...',
 
   'sev.critical': 'CRÍTICO',
@@ -93,9 +95,9 @@ export const es: Record<string, string> = {
   'review.agentHint2': 'sin confirmar: veredicto, observaciones con líneas',
   'review.agentHint3': 'y puntos fuertes del código.',
 
-  'verdict.approve': '✓ APROBADO',
-  'verdict.comment': '💬 HAY COMENTARIOS',
-  'verdict.request_changes': '✗ SE REQUIEREN CAMBIOS',
+  'verdict.approve': 'APROBADO',
+  'verdict.comment': 'HAY COMENTARIOS',
+  'verdict.request_changes': 'SE REQUIEREN CAMBIOS',
 
   'reviewcat.bug': 'BUG',
   'reviewcat.security': 'SEGURIDAD',
@@ -109,6 +111,7 @@ export const es: Record<string, string> = {
 
   'editor.openFileHint': 'Abre un archivo desde el explorador',
   'editor.orCreateRule': 'o crea una regla a partir del fragmento seleccionado',
+  'editor.suggestionPrefix': 'Sugerencia',
   'editor.unsaved': 'Cambios sin guardar',
   'editor.createRuleFromSelection': 'Crear regla a partir de la selección',
 
@@ -149,6 +152,7 @@ export const es: Record<string, string> = {
   'rules.stateActive': '● ACTIVA',
   'rules.stateInactive': '○ INACT.',
   'rules.deleteConfirm': '¿Eliminar la regla «{description}»?',
+  'rules.deleteConfirmTitle': 'Eliminar regla',
   'rules.categorySyntax': 'Sintaxis',
   'rules.categorySemantic': 'Semántica',
   'rules.categoryAnalysis': 'Análisis',
@@ -312,10 +316,8 @@ export const es: Record<string, string> = {
   'audit.agentUnavailable': 'Subagente no disponible: {error}',
   'audit.openFile': 'Abrir archivo',
   'audit.falsePositive': 'El subagente lo considera un falso positivo',
-  'audit.emptyLine1': 'Auditoría multiagente: escaneo determinista,',
-  'audit.emptyLine2': 'luego subagentes por dominio (inyecciones, secretos,',
-  'audit.emptyLine3': 'criptografía, configuración, dependencias)',
-  'audit.emptyLine4': 'y un sintetizador con el veredicto final.',
+  'audit.emptyTitle': 'Auditoría multiagente',
+  'audit.emptyLine1': 'Escaneo determinista, luego subagentes por dominio (inyecciones, secretos, criptografía, configuración, dependencias) y un sintetizador con el veredicto final.',
   'audit.sev.critical': 'CRÍT',
   'audit.sev.warning': 'IMPT',
   'audit.sev.info': 'INFO',
@@ -346,14 +348,17 @@ export const es: Record<string, string> = {
   'app.fileNotInTabs': 'Archivo no encontrado entre las pestañas abiertas',
   'app.saved': 'Guardado: {name}',
   'app.confirmCloseDirty': 'Cambios sin guardar en {count} archivos:\n\n{list}\n\n¿Continuar? Los cambios se perderán.',
+  'app.confirmCloseDirtyTitle': 'Cambios sin guardar',
   'app.noActiveFile': 'No hay archivo activo',
   'app.noDataToReset': 'No hay datos que restablecer',
   'app.resultsReset': 'Resultados de {name} restablecidos',
   'app.noResultsToReset': 'No hay resultados que restablecer',
   'app.confirmClearAll': '¿Eliminar los resultados de análisis de los {count} archivos?',
+  'app.confirmClearAllTitle': 'Restablecer resultados del análisis',
   'app.allResultsReset': 'Todos los resultados de análisis restablecidos',
   'app.chatHistoryEmpty': 'El historial ya está vacío',
   'app.confirmClearChat': '¿Vaciar el historial del chat?',
+  'app.confirmClearChatTitle': 'Vaciar historial del chat',
   'app.noReviewToReset': 'No hay resultados de revisión que restablecer',
   'app.reviewReset': 'Resultados de revisión restablecidos',
 
@@ -434,4 +439,8 @@ export const es: Record<string, string> = {
   'app.reportButtonTitle': 'Informe resumen ({count} archivos)',
   'app.analyzeFileTitle': 'Analizar archivo actual: {name}',
   'app.analyzeOpenFileFirst': 'Abre un archivo para analizar',
+
+  // Contexto y prompt del chat con IA (App.tsx)
+  'app.chatContextFile': 'Archivo: {path}\n\n{content}',
+  'app.fixViolationPrompt': 'Sugiere una corrección concreta para la infracción "{rule}" en la línea {line}: {explanation}',
 };

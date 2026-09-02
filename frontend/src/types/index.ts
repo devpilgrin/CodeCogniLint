@@ -32,6 +32,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  /** Признак сообщения об ошибке (вместо эвристики по префиксу ⚠️). */
+  isError?: boolean;
 }
 
 export interface GitCommit {

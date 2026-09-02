@@ -8,6 +8,7 @@ Git-операции поверх GitPython: status / diff / commit / push / pul
   1) параметр запроса, 2) env GIT_TOKEN, 3) env GITHUB_TOKEN,
   4) credential helper ОС (без токена — как настроен git).
 """
+import logging
 import os
 import re
 from pathlib import Path
@@ -24,8 +25,31 @@ DEFAULT_AUTHOR_NAME = "CodeCogniLint"
 DEFAULT_AUTHOR_EMAIL = "codecognilint@localhost"
 
 
+logger = logging.getLogger(__name__)
+
+
 class GitError(ValueError):
     """Ошибка git-операции с человекочитаемым сообщением."""
+
+
+# Валидация ref/SHA — защита от инъекции git-аргументов
+# (значение вида "--output=/path" не должно стать флагом).
+_REF_RE = re.compile(r"^[A-Za-z0-9._/\-]+$")
+_SHA_RE = re.compile(r"^[0-9a-fA-F]{4,64}$")
+
+
+def validate_ref(ref: str) -> str:
+    """Проверить git ref (ветка/тег/ревизия). Невалидное значение → GitError (HTTP 400/409)."""
+    if not ref or not _REF_RE.match(ref) or ref.lstrip().startswith("-"):
+        raise GitError(f"Некорректный git ref: {ref!r}")
+    return ref
+
+
+def validate_sha(sha: str) -> str:
+    """Проверить SHA коммита (hex 4–64). Невалидное значение → GitError (HTTP 400/409)."""
+    if not sha or not _SHA_RE.match(sha):
+        raise GitError(f"Некорректный SHA коммита: {sha!r}")
+    return sha
 
 
 def _repo(workspace: str) -> git.Repo:
@@ -125,7 +149,7 @@ def _ensure_author(repo: git.Repo) -> Optional[str]:
         if name and email:
             return None
     except Exception:
-        pass
+        logger.exception("Не удалось прочитать git user.name/email — задаю локальный fallback")
     with repo.config_writer() as cw:
         cw.set_value("user", "name", DEFAULT_AUTHOR_NAME)
         cw.set_value("user", "email", DEFAULT_AUTHOR_EMAIL)
@@ -203,6 +227,9 @@ def push(workspace: str, token: Optional[str] = None) -> dict:
         err = re.sub(r"https://[^@/]+@", "https://***@", err)  # не утекает токен
         raise GitError(f"Git push не удался: {err}")
 
+    logger.info("git push: workspace=%s branch=%s remote=%s",
+                workspace, branch, _sanitize_url(origin.url))
+
     return {
         "branch": branch,
         "remote": _sanitize_url(origin.url),
@@ -259,6 +286,7 @@ _CODE_EXT_FOR_DIFF = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs"
 
 def commit_show(workspace: str, sha: str) -> dict:
     """Метаданные коммита + unified diff (обрезан для LLM)."""
+    sha = validate_sha(sha)
     repo = _repo(workspace)
     try:
         c = repo.commit(sha)
@@ -304,9 +332,10 @@ def branches(workspace: str) -> dict:
 
 def changed_files(workspace: str, base: str, head: str = "HEAD") -> list[str]:
     """Изменённые кодовые файлы между ref'ами (git diff --name-only base head)."""
+    base, head = validate_ref(base), validate_ref(head)
     repo = _repo(workspace)
     try:
-        out = repo.git.diff(base, head, name_only=True)
+        out = repo.git.diff(base, head, "--", name_only=True)
     except GitCommandError as e:
         raise GitError(f"git diff {base}..{head}: {e}")
     return sorted(p for p in out.splitlines()

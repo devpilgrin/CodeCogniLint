@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
-from .git_service import _repo, changed_files, GitError
+from .git_service import _repo, changed_files, validate_ref, GitError
 from .security_service import scan_semgrep, _fingerprint
 from .quality_service import scan_quality_rules
 
@@ -61,7 +61,8 @@ def _worktrees(repo, refs: list[str]):
         for ref in refs:
             tmp = tempfile.mkdtemp(prefix="ccl-wt-")
             tmpdirs.append(tmp)
-            repo.git.worktree("add", "--detach", tmp, ref)
+            # ref валидируем: значение вида "--opt=..." не должно стать флагом
+            repo.git.worktree("add", "--detach", tmp, validate_ref(ref))
             paths.append(tmp)
         yield paths
     finally:

@@ -44,6 +44,7 @@ export const en: Record<string, string> = {
   'common.delete': 'Delete',
   'common.edit': 'Edit',
   'common.create': 'Create',
+  'common.confirm': 'Confirm',
 
   'ai.insights': 'AI Insights',
   'ai.resetFile': 'Reset results for the current file',
@@ -71,6 +72,7 @@ export const en: Record<string, string> = {
   'ai.line': 'line {line}',
   'ai.askFix': 'Ask LLM about the fix →',
   'ai.context': 'Context',
+  'ai.comingSoon': 'Soon',
   'ai.chatPlaceholder': 'Ask AI about the code...',
 
   'sev.critical': 'CRITICAL',
@@ -93,9 +95,9 @@ export const en: Record<string, string> = {
   'review.agentHint2': 'changes: verdict, issues with line anchors',
   'review.agentHint3': 'and code strengths.',
 
-  'verdict.approve': '✓ APPROVED',
-  'verdict.comment': '💬 COMMENTS',
-  'verdict.request_changes': '✗ CHANGES REQUESTED',
+  'verdict.approve': 'APPROVED',
+  'verdict.comment': 'COMMENTS',
+  'verdict.request_changes': 'CHANGES REQUESTED',
 
   'reviewcat.bug': 'BUG',
   'reviewcat.security': 'SECURITY',
@@ -109,6 +111,7 @@ export const en: Record<string, string> = {
 
   'editor.openFileHint': 'Open a file from the explorer',
   'editor.orCreateRule': 'or create a rule from the selected fragment',
+  'editor.suggestionPrefix': 'Suggestion',
   'editor.unsaved': 'Unsaved changes',
   'editor.createRuleFromSelection': 'Create rule from selection',
 
@@ -149,6 +152,7 @@ export const en: Record<string, string> = {
   'rules.stateActive': '● ACTIVE',
   'rules.stateInactive': '○ OFF',
   'rules.deleteConfirm': 'Delete rule "{description}"?',
+  'rules.deleteConfirmTitle': 'Delete rule',
   'rules.categorySyntax': 'Syntax',
   'rules.categorySemantic': 'Semantic',
   'rules.categoryAnalysis': 'Analysis',
@@ -312,10 +316,8 @@ export const en: Record<string, string> = {
   'audit.agentUnavailable': 'Sub-agent unavailable: {error}',
   'audit.openFile': 'Open file',
   'audit.falsePositive': 'Sub-agent considers this a false positive',
-  'audit.emptyLine1': 'Multi-agent audit: deterministic scan,',
-  'audit.emptyLine2': 'then domain sub-agents (injection, secrets,',
-  'audit.emptyLine3': 'cryptography, configuration, dependencies)',
-  'audit.emptyLine4': 'and a synthesizer with the final verdict.',
+  'audit.emptyTitle': 'Multi-agent audit',
+  'audit.emptyLine1': 'Deterministic scan, then domain sub-agents (injection, secrets, cryptography, configuration, dependencies) and a synthesizer with the final verdict.',
   'audit.sev.critical': 'CRIT',
   'audit.sev.warning': 'WARN',
   'audit.sev.info': 'INFO',
@@ -346,14 +348,17 @@ export const en: Record<string, string> = {
   'app.fileNotInTabs': 'File not found among open tabs',
   'app.saved': 'Saved: {name}',
   'app.confirmCloseDirty': 'Unsaved changes in {count} files:\n\n{list}\n\nContinue? Changes will be lost.',
+  'app.confirmCloseDirtyTitle': 'Unsaved changes',
   'app.noActiveFile': 'No active file',
   'app.noDataToReset': 'Nothing to reset',
   'app.resultsReset': 'Results for {name} reset',
   'app.noResultsToReset': 'No results to reset',
   'app.confirmClearAll': 'Delete analysis results for all {count} files?',
+  'app.confirmClearAllTitle': 'Reset analysis results',
   'app.allResultsReset': 'All analysis results reset',
   'app.chatHistoryEmpty': 'History is already empty',
   'app.confirmClearChat': 'Clear chat history?',
+  'app.confirmClearChatTitle': 'Clear chat history',
   'app.noReviewToReset': 'No review results to reset',
   'app.reviewReset': 'Review results reset',
 
@@ -434,4 +439,8 @@ export const en: Record<string, string> = {
   'app.reportButtonTitle': 'Summary report ({count} files)',
   'app.analyzeFileTitle': 'Analyze current file: {name}',
   'app.analyzeOpenFileFirst': 'Open a file to analyze',
+
+  // AI chat context and prompt (App.tsx)
+  'app.chatContextFile': 'File: {path}\n\n{content}',
+  'app.fixViolationPrompt': 'Suggest a concrete fix for the violation "{rule}" on line {line}: {explanation}',
 };

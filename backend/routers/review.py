@@ -31,7 +31,7 @@ async def review_uncommitted_changes():
 
 
 class CommitReviewRequest(BaseModel):
-    sha: str = Field(min_length=4, max_length=64)
+    sha: str = Field(min_length=4, max_length=64, pattern=r"^[0-9a-fA-F]{4,64}$")
 
 
 @router.post("/commit")

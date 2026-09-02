@@ -2,14 +2,16 @@ import { useRef, useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBrain, faSyncAlt, faExpandAlt, faCompressAlt, faRobot,
-  faInfoCircle, faPaperPlane, faCheckCircle,
+  faInfoCircle, faPaperPlane, faCheckCircle, faUser,
   faArrowRight, faLightbulb, faComments, faTools,
-  faExclamationTriangle, faClipboardCheck,
+  faExclamationTriangle, faClipboardCheck, faChartBar,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ChatMessage, Violation, AnalysisScope } from '../types';
 import { ReviewTab } from './ReviewTab';
 import type { ReviewMode, ReviewState } from '../hooks/useReview';
 import { useI18n } from '../i18n';
+import { severityStyles, severityBadge, categoryBadge } from './ui/severity';
+import { EmptyState } from './ui/EmptyState';
 
 export type AIView = AnalysisScope | 'chat' | 'review';
 
@@ -33,27 +35,12 @@ interface Props {
   onReviewFile: () => void;
   onReviewChanges: () => void;
   onOpenFile: (path: string) => void;
+  // Сводный отчёт
+  onOpenReport: () => void;
+  reportCount: number;
 }
 
 const QUICK_PROMPTS = ['#explain', '#refactor', '#security', '#blame'];
-
-const severityBg: Record<string, string> = {
-  critical: 'border-orange-500/40 bg-orange-500/5 hover:bg-orange-500/10',
-  warning:  'border-yellow-500/40 bg-yellow-500/5 hover:bg-yellow-500/10',
-  info:     'border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10',
-};
-
-const severityBadge: Record<string, string> = {
-  critical: 'text-orange-400 bg-orange-400/10',
-  warning:  'text-yellow-400 bg-yellow-400/10',
-  info:     'text-blue-400 bg-blue-400/10',
-};
-
-const categoryBadge: Record<string, string> = {
-  syntax:   'text-blue-300 bg-blue-300/10',
-  semantic: 'text-purple-300 bg-purple-300/10',
-  analysis: 'text-orange-300 bg-orange-300/10',
-};
 
 export function AIPanel({
   messages, violations, view, onViewChange,
@@ -61,16 +48,17 @@ export function AIPanel({
   onResetData, tabsCollapsed, onToggleTabsCollapsed,
   reviewing, reviewState, reviewError, activeFilePath, hasWorkspace,
   onReviewFile, onReviewChanges, onOpenFile,
+  onOpenReport, reportCount,
 }: Props) {
   const { t } = useI18n();
   const [input, setInput] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  const SCOPE_TABS: { value: AnalysisScope; label: string }[] = [
+  const SCOPE_TABS: { value: AnalysisScope; label: string; soon?: boolean }[] = [
     { value: 'file',       label: t('ai.scopeFile') },
-    { value: 'commit',     label: t('ai.scopeCommit') },
-    { value: 'pr',         label: 'PR/MR' },
-    { value: 'repository', label: t('ai.scopeRepo') },
+    { value: 'commit',     label: t('ai.scopeCommit'), soon: true },
+    { value: 'pr',         label: 'PR/MR', soon: true },
+    { value: 'repository', label: t('ai.scopeRepo'), soon: true },
   ];
 
   useEffect(() => {
@@ -89,21 +77,45 @@ export function AIPanel({
   const unreadHint = messages.length > 1 && view !== 'chat';
 
   return (
-    <aside className="w-80 border-l border-[#30363d] bg-[#161b22] flex flex-col flex-shrink-0">
+    <aside className="w-80 border-l border-border-default bg-bg-surface flex flex-col flex-shrink-0">
       {/* Header */}
-      <div className="p-3 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117] flex-shrink-0">
-        <span className="text-xs font-bold text-gray-300 flex items-center">
+      <div className="p-3 border-b border-border-default flex justify-between items-center bg-bg-canvas flex-shrink-0">
+        <span className="text-xs font-bold text-text-primary flex items-center">
           <FontAwesomeIcon icon={faBrain} className="mr-2 text-blue-400" />
           {t('ai.insights')}
           {view === 'file' && violations.length > 0 && (
-            <span className="ml-2 text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
+            <span className="ml-2 text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
               {violations.length}
             </span>
           )}
         </span>
-        <div className="flex space-x-3 text-gray-500 text-xs">
+        <div className="flex space-x-3 text-text-muted text-xs">
+          <button
+            onClick={onOpenReport}
+            disabled={reportCount === 0}
+            aria-label={t('report.title')}
+            title={
+              reportCount === 0
+                ? t('app.reportNeedAnalysis')
+                : t('app.reportButtonTitle', { count: reportCount })
+            }
+            className="relative hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <FontAwesomeIcon icon={faChartBar} />
+            {reportCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 text-[11px] font-bold bg-purple-600 text-white px-1 rounded-full leading-3">
+                {reportCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={onResetData}
+            aria-label={
+              view === 'file'       ? t('ai.resetFile') :
+              view === 'repository' ? t('ai.resetRepo') :
+              view === 'chat'       ? t('ai.resetChat') :
+              t('ai.resetTab')
+            }
             title={
               view === 'file'       ? t('ai.resetFile') :
               view === 'repository' ? t('ai.resetRepo') :
@@ -116,6 +128,7 @@ export function AIPanel({
           </button>
           <button
             onClick={onToggleTabsCollapsed}
+            aria-label={tabsCollapsed ? t('ai.showAllTabs') : t('ai.hideInactiveTabs')}
             title={tabsCollapsed ? t('ai.showAllTabs') : t('ai.hideInactiveTabs')}
             className={`transition-colors ${tabsCollapsed ? 'text-blue-400' : 'hover:text-white'}`}
           >
@@ -125,28 +138,33 @@ export function AIPanel({
       </div>
 
       {/* Tabs: scope tabs + Chat */}
-      <div className="flex border-b border-[#30363d] flex-shrink-0 text-[10px] font-semibold">
+      <div className="flex border-b border-border-default flex-shrink-0 text-xs font-semibold overflow-x-auto no-scrollbar">
         {(tabsCollapsed ? SCOPE_TABS.filter(t => t.value === view) : SCOPE_TABS).map(opt => (
           <button
             key={opt.value}
             onClick={() => onViewChange(opt.value)}
-            className={`flex-1 py-1.5 transition-colors ${
+            className={`flex-1 min-w-fit whitespace-nowrap px-2 py-1.5 transition-colors ${
               view === opt.value
                 ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500'
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-primary'
             }`}
             title={opt.label}
           >
             {opt.label}
+            {opt.soon && (
+              <span className="ml-1 text-[9px] font-normal px-1 py-px rounded bg-bg-overlay border border-border-default text-text-muted align-middle">
+                {t('ai.comingSoon')}
+              </span>
+            )}
           </button>
         ))}
-        <div className="w-px bg-[#30363d] self-stretch my-1" />
+        <div className="w-px bg-border-default self-stretch my-1 flex-shrink-0" />
         <button
           onClick={() => onViewChange('review')}
-          className={`flex-1 py-1.5 transition-colors ${
+          className={`flex-1 min-w-fit whitespace-nowrap px-2 py-1.5 transition-colors ${
             view === 'review'
               ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500'
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-primary'
           }`}
           title={t('ai.reviewTooltip')}
         >
@@ -155,10 +173,10 @@ export function AIPanel({
         </button>
         <button
           onClick={() => onViewChange('chat')}
-          className={`flex-1 py-1.5 transition-colors relative ${
+          className={`flex-1 min-w-fit whitespace-nowrap px-2 py-1.5 transition-colors relative ${
             view === 'chat'
               ? 'bg-blue-600/20 text-blue-400 border-b-2 border-blue-500'
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-primary'
           }`}
         >
           <FontAwesomeIcon icon={faComments} className="mr-1" />
@@ -201,77 +219,72 @@ export function AIPanel({
       )}
     </aside>
   );
+}
 
-  // --- Sub-components ---
+// --- Sub-components (module level — иначе remount при каждом рендере AIPanel) ---
 
-  function FileTabContent({ violations, onJumpToLine, onApplyFix, t }: {
-    violations: Violation[];
-    onJumpToLine: (line: number) => void;
-    onApplyFix: (v: Violation) => void;
-    t: (key: string, vars?: Record<string, string | number>) => string;
-  }) {
-    if (violations.length === 0) {
-      return (
-        <div className="flex-1 flex items-center justify-center p-6 text-center">
-          <div>
-            <FontAwesomeIcon icon={faCheckCircle} className="text-3xl text-gray-600 mb-2" />
-            <p className="text-xs text-gray-400 leading-relaxed">
-              {t('ai.noViolations')}<br />
-              {t('ai.noViolationsHint1')}<br />
-              {t('ai.noViolationsHint2')}
-            </p>
-          </div>
-        </div>
-      );
-    }
+function FileTabContent({ violations, onJumpToLine, onApplyFix, t }: {
+  violations: Violation[];
+  onJumpToLine: (line: number) => void;
+  onApplyFix: (v: Violation) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  if (violations.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
-        {violations.map((v, i) => (
-          <div
-            key={i}
-            className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${severityBg[v.severity]}`}
-            onClick={() => onJumpToLine(v.line_start)}
-            title={t('ai.jumpToLine')}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1">
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${severityBadge[v.severity]}`}>
-                  {t(`sev.${v.severity}`)}
-                </span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${categoryBadge[v.category]}`}>
-                  {v.category.toUpperCase()}
-                </span>
-              </div>
-              <span className="text-[10px] text-gray-500 flex items-center">
-                {t('ai.line', { line: v.line_start })}{v.line_end !== v.line_start ? `–${v.line_end}` : ''}
-                <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[8px]" />
-              </span>
-            </div>
-            <p className="text-[11px] text-gray-300 font-semibold leading-snug">{v.rule_description}</p>
-            {v.code_snippet && (
-              <pre className="text-[10px] code-font bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-gray-300 overflow-x-auto custom-scrollbar whitespace-pre">
-                {v.code_snippet}
-              </pre>
-            )}
-            <p className="text-[11px] text-gray-400 leading-relaxed">{v.explanation}</p>
-            {v.suggestion && (
-              <div className="flex items-start space-x-1 text-[10px] text-green-300/80 leading-relaxed">
-                <FontAwesomeIcon icon={faLightbulb} className="mt-0.5 flex-shrink-0" />
-                <span>{v.suggestion}</span>
-              </div>
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onApplyFix(v); }}
-              className="w-full text-[10px] bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/30 py-1 rounded transition-colors flex items-center justify-center"
-            >
-              <FontAwesomeIcon icon={faTools} className="mr-1.5 text-[9px]" />
-              {t('ai.askFix')}
-            </button>
-          </div>
-        ))}
-      </div>
+      <EmptyState
+        icon={faCheckCircle}
+        title={t('ai.noViolations')}
+        hint={`${t('ai.noViolationsHint1')} ${t('ai.noViolationsHint2')}`}
+      />
     );
   }
+  return (
+    <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+      {violations.map((v, i) => (
+        <div
+          key={i}
+          className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${severityStyles[v.severity]}`}
+          onClick={() => onJumpToLine(v.line_start)}
+          title={t('ai.jumpToLine')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1">
+              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${severityBadge[v.severity]}`}>
+                {t(`sev.${v.severity}`)}
+              </span>
+              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${categoryBadge[v.category]}`}>
+                {v.category.toUpperCase()}
+              </span>
+            </div>
+            <span className="text-xs text-text-muted flex items-center">
+              {t('ai.line', { line: v.line_start })}{v.line_end !== v.line_start ? `–${v.line_end}` : ''}
+              <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[11px]" />
+            </span>
+          </div>
+          <p className="text-xs text-text-primary font-semibold leading-snug">{v.rule_description}</p>
+          {v.code_snippet && (
+            <pre className="text-xs code-font bg-bg-canvas border border-border-default rounded px-2 py-1 text-text-primary overflow-x-auto custom-scrollbar whitespace-pre">
+              {v.code_snippet}
+            </pre>
+          )}
+          <p className="text-xs text-text-secondary leading-relaxed">{v.explanation}</p>
+          {v.suggestion && (
+            <div className="flex items-start space-x-1 text-xs text-green-300/80 leading-relaxed">
+              <FontAwesomeIcon icon={faLightbulb} className="mt-0.5 flex-shrink-0" />
+              <span>{v.suggestion}</span>
+            </div>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onApplyFix(v); }}
+            className="w-full text-xs bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/30 py-1 rounded transition-colors flex items-center justify-center"
+          >
+            <FontAwesomeIcon icon={faTools} className="mr-1.5 text-[11px]" />
+            {t('ai.askFix')}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function PlaceholderTab({ title, hint }: { title: string; hint: string }) {
@@ -279,8 +292,8 @@ function PlaceholderTab({ title, hint }: { title: string; hint: string }) {
     <div className="flex-1 flex items-center justify-center p-6 text-center">
       <div>
         <FontAwesomeIcon icon={faExclamationTriangle} className="text-3xl text-gray-600 mb-2" />
-        <p className="text-xs text-gray-300 font-semibold mb-1">{title}</p>
-        <p className="text-[11px] text-gray-500 leading-relaxed">{hint}</p>
+        <p className="text-xs text-text-primary font-semibold mb-1">{title}</p>
+        <p className="text-xs text-text-muted leading-relaxed">{hint}</p>
       </div>
     </div>
   );
@@ -309,13 +322,15 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }:
               </div>
             );
           }
-          // Heuristic: assistant message starting with ⚠️ is an error
-          const isError = msg.role === 'assistant' && msg.content.trim().startsWith('⚠️');
+          // Сообщение об ошибке помечается флагом isError при создании (useAnalysis)
+          const isError = msg.role === 'assistant' && msg.isError === true;
           if (msg.role === 'user') {
             return (
               <div key={i} className="flex space-x-2">
-                <div className="w-6 h-6 rounded bg-gray-700 flex-shrink-0 flex items-center justify-center text-[10px]">👨‍💻</div>
-                <div className="bg-[#30363d] text-gray-200 p-2 rounded-tr-lg rounded-b-lg text-xs whitespace-pre-wrap">
+                <div className="w-6 h-6 rounded bg-gray-700 flex-shrink-0 flex items-center justify-center text-xs">
+                  <FontAwesomeIcon icon={faUser} className="text-gray-300" />
+                </div>
+                <div className="bg-border-default text-gray-200 p-2 rounded-tr-lg rounded-b-lg text-xs whitespace-pre-wrap">
                   {msg.content}
                 </div>
               </div>
@@ -323,7 +338,7 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }:
           }
           return (
             <div key={i} className="flex space-x-2">
-              <div className={`w-6 h-6 rounded flex-shrink-0 flex items-center justify-center text-[10px] ${isError ? 'bg-red-600' : 'bg-blue-600'}`}>
+              <div className={`w-6 h-6 rounded flex-shrink-0 flex items-center justify-center text-xs ${isError ? 'bg-red-600' : 'bg-blue-600'}`}>
                 <FontAwesomeIcon icon={faRobot} className="text-white" />
               </div>
               <div className={`p-2 rounded-tr-lg rounded-b-lg text-xs leading-relaxed whitespace-pre-wrap ${
@@ -340,7 +355,7 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }:
       </div>
 
       {/* Chat Input — only in Чат tab */}
-      <div className="p-3 bg-[#0d1117] border-t border-[#30363d] flex-shrink-0">
+      <div className="p-3 bg-bg-canvas border-t border-border-default flex-shrink-0">
         <div className="relative">
           <input
             type="text"
@@ -348,9 +363,14 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }:
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && onSend()}
             placeholder={t('ai.chatPlaceholder')}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded-md py-2 pl-3 pr-10 text-xs focus:outline-none focus:border-blue-500 text-gray-200"
+            className="w-full bg-bg-surface border border-border-default rounded-md py-2 pl-3 pr-10 text-xs focus:outline-none focus:border-blue-500 text-gray-200"
           />
-          <button onClick={onSend} className="absolute right-2 top-1.5 text-blue-500 hover:text-blue-400">
+          <button
+            onClick={onSend}
+            aria-label={t('ai.chatPlaceholder')}
+            title={t('ai.chatPlaceholder')}
+            className="absolute right-2 top-1.5 text-blue-500 hover:text-blue-400"
+          >
             <FontAwesomeIcon icon={faPaperPlane} />
           </button>
         </div>
@@ -359,7 +379,7 @@ function ChatTabContent({ messages, input, setInput, onSend, chatBottomRef, t }:
             <button
               key={p}
               onClick={() => setInput(p + ' ')}
-              className="text-[9px] text-gray-500 hover:text-gray-300 cursor-pointer bg-[#21262d] px-1.5 py-0.5 rounded border border-[#30363d]"
+              className="text-[11px] text-text-muted hover:text-text-primary cursor-pointer bg-bg-overlay px-1.5 py-0.5 rounded border border-border-default"
             >
               {p}
             </button>

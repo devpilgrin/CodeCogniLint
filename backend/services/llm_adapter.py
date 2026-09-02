@@ -1,3 +1,5 @@
+import os
+
 from openai import AsyncOpenAI, APIConnectionError, BadRequestError, APIStatusError
 from pydantic_settings import BaseSettings
 
@@ -17,12 +19,28 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Таймаут одного LLM-запроса (сек), переопределяется env CCL_LLM_TIMEOUT.
+# Без таймаута зависший LLM вешал SSE-поток анализа на неопределённое время.
+LLM_TIMEOUT = float(os.environ.get("CCL_LLM_TIMEOUT", "60"))
+# Потолок токенов ответа — иначе модель может генерировать бесконечно.
+LLM_MAX_TOKENS = 4096
+
+_client_cache: tuple[tuple, AsyncOpenAI] | None = None
+
 
 def get_client() -> AsyncOpenAI:
-    return AsyncOpenAI(
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-    )
+    """Кэшированный клиент: пересоздаётся при смене base_url/api_key/timeout
+    (настройки могут меняться в рантайме через /settings)."""
+    global _client_cache
+    key = (settings.llm_base_url, settings.llm_api_key, LLM_TIMEOUT)
+    if _client_cache is None or _client_cache[0] != key:
+        _client_cache = (key, AsyncOpenAI(
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key,
+            timeout=LLM_TIMEOUT,
+            max_retries=1,
+        ))
+    return _client_cache[1]
 
 
 def _friendly_error(exc: Exception) -> str:
@@ -62,6 +80,7 @@ async def chat_completion(messages: list[dict], temperature: float | None = None
             model=settings.llm_model,
             messages=messages,
             temperature=temp,
+            max_tokens=LLM_MAX_TOKENS,
         )
         return response.choices[0].message.content or ""
     except Exception as exc:

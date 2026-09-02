@@ -44,6 +44,7 @@ export const zh: Record<string, string> = {
   'common.delete': '删除',
   'common.edit': '编辑',
   'common.create': '创建',
+  'common.confirm': '确认',
 
   'ai.insights': 'AI 洞察',
   'ai.resetFile': '重置当前文件的结果',
@@ -71,6 +72,7 @@ export const zh: Record<string, string> = {
   'ai.line': '第 {line} 行',
   'ai.askFix': '询问 LLM 修复方案 →',
   'ai.context': '上下文',
+  'ai.comingSoon': '即将推出',
   'ai.chatPlaceholder': '向 AI 询问代码问题...',
 
   'sev.critical': '严重',
@@ -93,9 +95,9 @@ export const zh: Record<string, string> = {
   'review.agentHint2': '结论、按行定位的问题',
   'review.agentHint3': '以及代码优点。',
 
-  'verdict.approve': '✓ 已批准',
-  'verdict.comment': '💬 有评论',
-  'verdict.request_changes': '✗ 需要修改',
+  'verdict.approve': '已批准',
+  'verdict.comment': '有评论',
+  'verdict.request_changes': '需要修改',
 
   'reviewcat.bug': '缺陷',
   'reviewcat.security': '安全',
@@ -109,6 +111,7 @@ export const zh: Record<string, string> = {
 
   'editor.openFileHint': '从资源管理器打开文件',
   'editor.orCreateRule': '或从选中片段创建规则',
+  'editor.suggestionPrefix': '建议',
   'editor.unsaved': '未保存的更改',
   'editor.createRuleFromSelection': '从选中内容创建规则',
 
@@ -149,6 +152,7 @@ export const zh: Record<string, string> = {
   'rules.stateActive': '● 已启用',
   'rules.stateInactive': '○ 已禁用',
   'rules.deleteConfirm': '删除规则「{description}」？',
+  'rules.deleteConfirmTitle': '删除规则',
   'rules.categorySyntax': '语法',
   'rules.categorySemantic': '语义',
   'rules.categoryAnalysis': '分析',
@@ -312,10 +316,8 @@ export const zh: Record<string, string> = {
   'audit.agentUnavailable': '子代理不可用：{error}',
   'audit.openFile': '打开文件',
   'audit.falsePositive': '子代理认为这是误报',
-  'audit.emptyLine1': '多智能体审计：先进行确定性扫描，',
-  'audit.emptyLine2': '然后由领域子代理分析（注入、密钥、',
-  'audit.emptyLine3': '加密、配置、依赖），',
-  'audit.emptyLine4': '最后由综合器给出最终结论。',
+  'audit.emptyTitle': '多智能体审计',
+  'audit.emptyLine1': '先进行确定性扫描，然后由领域子代理分析（注入、密钥、加密、配置、依赖），最后由综合器给出最终结论。',
   'audit.sev.critical': '严重',
   'audit.sev.warning': '警告',
   'audit.sev.info': '提示',
@@ -346,14 +348,17 @@ export const zh: Record<string, string> = {
   'app.fileNotInTabs': '在已打开的标签页中未找到该文件',
   'app.saved': '已保存：{name}',
   'app.confirmCloseDirty': '{count} 个文件有未保存的更改：\n\n{list}\n\n继续吗？更改将丢失。',
+  'app.confirmCloseDirtyTitle': '未保存的更改',
   'app.noActiveFile': '没有活动文件',
   'app.noDataToReset': '没有可重置的数据',
   'app.resultsReset': '{name} 的结果已重置',
   'app.noResultsToReset': '没有可重置的结果',
   'app.confirmClearAll': '删除全部 {count} 个文件的分析结果？',
+  'app.confirmClearAllTitle': '重置分析结果',
   'app.allResultsReset': '所有分析结果已重置',
   'app.chatHistoryEmpty': '历史记录已为空',
   'app.confirmClearChat': '清空聊天记录？',
+  'app.confirmClearChatTitle': '清空聊天记录',
   'app.noReviewToReset': '没有可重置的评审结果',
   'app.reviewReset': '评审结果已重置',
 
@@ -434,4 +439,8 @@ export const zh: Record<string, string> = {
   'app.reportButtonTitle': '汇总报告（{count} 个文件）',
   'app.analyzeFileTitle': '分析当前文件：{name}',
   'app.analyzeOpenFileFirst': '打开要分析的文件',
+
+  // AI 聊天的上下文与提示词（App.tsx）
+  'app.chatContextFile': '文件：{path}\n\n{content}',
+  'app.fixViolationPrompt': '请针对第 {line} 行的违规「{rule}」提出具体的修复建议：{explanation}',
 };

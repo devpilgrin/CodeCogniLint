@@ -1,10 +1,10 @@
 [
   {
-    "id": "61bbc726-b198-4da9-8023-475416fbe11d",
+    "id": "b466bfa4-ceb1-4721-88c6-5e6b5071485a",
     "category": "analysis",
-    "description": "TODO",
-    "pattern_description": "Все TODO должны быть отмечены как техдолг",
-    "created_at": "2026-05-11T18:05:40.432197",
+    "description": "ИИ Анализ на ошибки",
+    "pattern_description": "Проведи полное сканирование на ошибки код",
+    "created_at": "2026-09-02T17:19:24.448010+00:00",
     "enabled": true
   }
 ]

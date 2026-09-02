@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faPlus, faPencil } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPencil } from '@fortawesome/free-solid-svg-icons';
 import type { Rule, RuleCategory } from '../types';
 import { useI18n } from '../i18n';
+import { Dialog } from './ui/Dialog';
+import { ErrorBanner } from './ui/ErrorBanner';
+import { Button } from './ui/Button';
 
 interface Props {
   /** If provided, dialog is in edit mode; otherwise create mode. */
@@ -60,126 +63,107 @@ export function ManualRuleDialog({ initial, loading, error, onSubmit, onClose }:
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div className="bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
-        <div className="flex items-center justify-between p-4 border-b border-[#30363d]">
-          <h3 className="text-sm font-bold text-white flex items-center">
-            <FontAwesomeIcon icon={isEdit ? faPencil : faPlus} className="mr-2 text-blue-400" />
-            {isEdit ? t('manualrule.titleEdit') : t('manualrule.titleCreate')}
-          </h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
-          {/* Category */}
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase font-semibold mb-2">{t('manualrule.categoryLabel')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat.value}
-                  onClick={() => setCategory(cat.value)}
-                  className={`p-2 rounded border text-left transition-colors ${
-                    category === cat.value ? cat.color : 'border-[#30363d] hover:border-gray-500 bg-[#0d1117]'
-                  }`}
-                >
-                  <p className="text-xs text-gray-200 font-semibold">{t(categoryLabelKey(cat.value))}</p>
-                  <p className="text-[9px] text-gray-500 mt-0.5">{t(cat.descKey)}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <div className="flex justify-between items-baseline mb-1">
-              <label className="text-[10px] text-gray-500 uppercase font-semibold">
-                {t('manualrule.descriptionLabel')} <span className="text-red-400 normal-case">*</span>
-              </label>
-              {!isEdit && (
-                <button
-                  type="button"
-                  onClick={fillExample}
-                  className="text-[9px] text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  {t('manualrule.fillExample')}
-                </button>
-              )}
-            </div>
-            <input
-              type="text"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder={t(exampleKey(category, 'Description'))}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
-              maxLength={500}
-            />
-            <p className="text-[9px] text-gray-600 mt-1">{t('manualrule.descriptionHint')}</p>
-          </div>
-
-          {/* Pattern description */}
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">
-              {t('manualrule.patternLabel')} <span className="text-red-400 normal-case">*</span>
-            </label>
-            <textarea
-              value={patternDescription}
-              onChange={e => setPatternDescription(e.target.value)}
-              placeholder={t(exampleKey(category, 'Pattern'))}
-              rows={4}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font resize-none"
-              maxLength={2000}
-            />
-            <p className="text-[9px] text-gray-600 mt-1">
-              {t('manualrule.patternHint')}
-            </p>
-          </div>
-
-          {/* Enabled toggle */}
-          <label className="flex items-center justify-between p-3 bg-[#0d1117] border border-[#30363d] rounded cursor-pointer">
-            <div>
-              <p className="text-xs text-gray-200 font-semibold">{t('manualrule.ruleActive')}</p>
-              <p className="text-[10px] text-gray-500">{t('manualrule.ruleActiveHint')}</p>
-            </div>
-            <Toggle checked={enabled} onChange={setEnabled} />
-          </label>
-
-          {error && (
-            <div className="p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-400">
-              ⚠️ {error}
-            </div>
-          )}
-        </div>
-
-        <div className="flex space-x-2 p-4 border-t border-[#30363d]">
-          <button
-            onClick={onClose}
-            className="flex-1 bg-[#30363d] hover:bg-[#484f58] text-gray-300 text-xs py-2 rounded transition-colors"
-          >
+    <Dialog
+      title={isEdit ? t('manualrule.titleEdit') : t('manualrule.titleCreate')}
+      icon={isEdit ? faPencil : faPlus}
+      onClose={onClose}
+      maxWidth="max-w-lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} className="flex-1">
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs py-2 rounded transition-colors flex items-center justify-center"
+            loading={loading}
+            className="flex-1"
           >
-            {loading ? (
-              <>
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                {t('manualrule.saving')}
-              </>
-            ) : (
-              <>
-                <FontAwesomeIcon icon={isEdit ? faPencil : faPlus} className="mr-2" />
-                {isEdit ? t('manualrule.saveChanges') : t('manualrule.createRule')}
-              </>
-            )}
-          </button>
+            {!loading && <FontAwesomeIcon icon={isEdit ? faPencil : faPlus} className="mr-2" />}
+            {loading
+              ? t('manualrule.saving')
+              : isEdit ? t('manualrule.saveChanges') : t('manualrule.createRule')}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Category */}
+        <div>
+          <p className="text-[10px] text-text-muted uppercase font-semibold mb-2">{t('manualrule.categoryLabel')}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.value}
+                onClick={() => setCategory(cat.value)}
+                className={`p-2 rounded border text-left transition-colors ${
+                  category === cat.value ? cat.color : 'border-border-default hover:border-gray-500 bg-bg-canvas'
+                }`}
+              >
+                <p className="text-xs text-gray-200 font-semibold">{t(categoryLabelKey(cat.value))}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">{t(cat.descKey)}</p>
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Description */}
+        <div>
+          <div className="flex justify-between items-baseline mb-1">
+            <label className="text-[10px] text-text-muted uppercase font-semibold">
+              {t('manualrule.descriptionLabel')} <span className="text-red-400 normal-case">*</span>
+            </label>
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={fillExample}
+                className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {t('manualrule.fillExample')}
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={t(exampleKey(category, 'Description'))}
+            className="w-full bg-bg-canvas border border-border-default rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+            maxLength={500}
+          />
+          <p className="text-[11px] text-gray-600 mt-1">{t('manualrule.descriptionHint')}</p>
+        </div>
+
+        {/* Pattern description */}
+        <div>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">
+            {t('manualrule.patternLabel')} <span className="text-red-400 normal-case">*</span>
+          </label>
+          <textarea
+            value={patternDescription}
+            onChange={e => setPatternDescription(e.target.value)}
+            placeholder={t(exampleKey(category, 'Pattern'))}
+            rows={4}
+            className="w-full bg-bg-canvas border border-border-default rounded px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font resize-none"
+            maxLength={2000}
+          />
+          <p className="text-[11px] text-gray-600 mt-1">
+            {t('manualrule.patternHint')}
+          </p>
+        </div>
+
+        {/* Enabled toggle */}
+        <label className="flex items-center justify-between p-3 bg-bg-canvas border border-border-default rounded cursor-pointer">
+          <div>
+            <p className="text-xs text-gray-200 font-semibold">{t('manualrule.ruleActive')}</p>
+            <p className="text-xs text-text-muted">{t('manualrule.ruleActiveHint')}</p>
+          </div>
+          <Toggle checked={enabled} onChange={setEnabled} />
+        </label>
+
+        {error && <ErrorBanner message={error} />}
       </div>
-    </div>
+    </Dialog>
   );
 }
 

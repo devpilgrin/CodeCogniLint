@@ -1,6 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import axios from 'axios';
-import { gitApi, compareApi } from '../services/api';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { gitApi, compareApi, apiErrorMessage } from '../services/api';
 import { useI18n } from '../i18n';
 import type { GitStatus, GitLogEntry, PrResult, CompareResult } from '../types';
 
@@ -11,18 +10,12 @@ export interface GitNotice {
   text: string;
 }
 
-function errText(e: unknown, offlineText: string): string {
-  if (axios.isAxiosError(e)) {
-    const detail = (e.response?.data as { detail?: string } | undefined)?.detail;
-    if (detail) return detail;
-    if (e.code === 'ERR_NETWORK') return offlineText;
-    return e.message;
-  }
-  return e instanceof Error ? e.message : String(e);
-}
-
 export function useGit(workspacePath: string | null) {
   const { t } = useI18n();
+  // t через ref, чтобы refresh не зависел от языка интерфейса (смена языка не должна триггерить git-рефреш)
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
+
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [commits, setCommits] = useState<GitLogEntry[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
@@ -41,7 +34,8 @@ export function useGit(workspacePath: string | null) {
       setBranches(br.branches);
       setNotRepo(false);
     } catch (e) {
-      const msg = errText(e, t('err.backendOfflineShort'));
+      const msg = apiErrorMessage(e, tRef.current('err.backendOfflineShort'));
+      // TODO: бэкенд не возвращает структурированный код ошибки для «не репозиторий» — определяем по тексту detail; если бэкенд добавит код/поле ошибки, использовать его вместо подстроки.
       if (msg.includes('не является git-репозиторием')) {
         setNotRepo(true);
         setStatus(null);
@@ -52,7 +46,7 @@ export function useGit(workspacePath: string | null) {
     } finally {
       setBusy(b => (b === 'refresh' ? null : b));
     }
-  }, [workspacePath, t]);
+  }, [workspacePath]);
 
   useEffect(() => {
     setStatus(null);
@@ -73,11 +67,11 @@ export function useGit(workspacePath: string | null) {
     setBusy('commit');
     try {
       const r = await gitApi.commit(message);
-      setNotice({ kind: 'ok', text: t('git.noticeCommit', { hash: r.hash, message: r.message.split('\n')[0] }) + (r.note ? t('git.noticeCommitNote', { note: r.note }) : '') });
+      setNotice({ kind: 'ok', text: t('git.noticeCommit', { hash: r.hash, message: r.message.split('\n')[0] ?? '' }) + (r.note ? t('git.noticeCommitNote', { note: r.note }) : '') });
       await refresh();
       return true;
     } catch (e) {
-      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+      setNotice({ kind: 'err', text: apiErrorMessage(e, t('err.backendOfflineShort')) });
       return false;
     } finally {
       setBusy(null);
@@ -92,7 +86,7 @@ export function useGit(workspacePath: string | null) {
       await refresh();
       return true;
     } catch (e) {
-      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+      setNotice({ kind: 'err', text: apiErrorMessage(e, t('err.backendOfflineShort')) });
       return false;
     } finally {
       setBusy(null);
@@ -107,7 +101,7 @@ export function useGit(workspacePath: string | null) {
       await refresh();
       return true;
     } catch (e) {
-      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+      setNotice({ kind: 'err', text: apiErrorMessage(e, t('err.backendOfflineShort')) });
       return false;
     } finally {
       setBusy(null);
@@ -127,7 +121,7 @@ export function useGit(workspacePath: string | null) {
       await refresh();
       return r;
     } catch (e) {
-      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+      setNotice({ kind: 'err', text: apiErrorMessage(e, t('err.backendOfflineShort')) });
       return null;
     } finally {
       setBusy(null);
@@ -139,7 +133,7 @@ export function useGit(workspacePath: string | null) {
     try {
       setCompareResult(await compareApi.run(base, head));
     } catch (e) {
-      setNotice({ kind: 'err', text: errText(e, t('err.backendOfflineShort')) });
+      setNotice({ kind: 'err', text: apiErrorMessage(e, t('err.backendOfflineShort')) });
     } finally {
       setBusy(null);
     }

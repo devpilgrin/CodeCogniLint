@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWandMagicSparkles, faChartBar } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
 import { Header } from './components/Header';
 import { ActivityBar } from './components/ActivityBar';
@@ -14,6 +14,7 @@ import { ManualRuleDialog } from './components/ManualRuleDialog';
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { ReportDialog } from './components/ReportDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 
 import { useRules } from './hooks/useRules';
 import { useAnalysis } from './hooks/useAnalysis';
@@ -31,6 +32,13 @@ type SidebarPanel = 'explorer' | 'search' | 'git' | 'rules' | 'settings' | 'secu
 interface PendingRule {
   code: string;
   category: RuleCategory;
+}
+
+/** Отложенное подтверждение деструктивного действия (ConfirmDialog). */
+interface ConfirmRequest {
+  title: string;
+  body: string;
+  action: () => void;
 }
 
 export default function App() {
@@ -52,9 +60,13 @@ export default function App() {
   const [reportOpen, setReportOpen] = useState(false);
   const [pendingCloseTab, setPendingCloseTab] = useState<OpenTab | null>(null);
   const [saveToast, setSaveToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
+  // ref на актуальные табы — читаем актуальное состояние в асинхронных колбэках без side-эффектов внутри апдейтеров setState
+  const tabsRef = useRef<OpenTab[]>([]);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   const editorPaneRef = useRef<EditorPaneHandle>(null);
 
@@ -64,7 +76,7 @@ export default function App() {
   } = useRules();
   const {
     resultsByFile, messages, analyzing, progress, stepLabel,
-    analyzeFile, analyzeRepository, sendMessage,
+    analyzeFile, analyzeRepository, cancelAnalysis, sendMessage,
     clearFileResult, clearAllResults, clearMessages,
   } = useAnalysis();
   const {
@@ -100,7 +112,8 @@ export default function App() {
 
   // ---- Tab management ----
   const openFile = useCallback(async (path: string) => {
-    const idx = tabs.findIndex(t => t.path === path);
+    const current = tabsRef.current;
+    const idx = current.findIndex(t => t.path === path);
     if (idx >= 0) {
       setActiveTabIndex(idx);
       return;
@@ -116,11 +129,18 @@ export default function App() {
       originalContent: data.content,
       dirty: false,
     };
-    setTabs(prev => {
-      setActiveTabIndex(prev.length);
-      return [...prev, tab];
-    });
-  }, [tabs, workspace, loadFile]);
+    // Вычисляем новые табы и индекс атомарно из актуального списка — без side-эффектов внутри апдейтеров setState
+    const currentTabs = tabsRef.current;
+    const existingIdx = currentTabs.findIndex(t => t.path === path);
+    if (existingIdx >= 0) {
+      setActiveTabIndex(existingIdx);
+      return;
+    }
+    const nextTabs = [...currentTabs, tab];
+    tabsRef.current = nextTabs;
+    setTabs(nextTabs);
+    setActiveTabIndex(nextTabs.length - 1);
+  }, [workspace, loadFile]);
 
   const forceCloseFile = useCallback((path: string) => {
     setTabs(prev => {
@@ -205,35 +225,66 @@ export default function App() {
   }, [saveToast]);
 
   // ---- Workspace ----
-  const confirmDiscardDirty = useCallback((): boolean => {
-    const dirty = tabs.filter(t => t.dirty);
-    if (dirty.length === 0) return true;
+  /**
+   * Если есть несохранённые табы — показывает ConfirmDialog и выполняет action
+   * только после подтверждения; иначе выполняет сразу.
+   */
+  const runAfterDirtyConfirm = useCallback((action: () => void) => {
+    const dirty = tabsRef.current.filter(t => t.dirty);
+    if (dirty.length === 0) {
+      action();
+      return;
+    }
     const list = dirty.map(t => '• ' + t.path).join('\n');
-    return window.confirm(
-      t('app.confirmCloseDirty', { count: dirty.length, list })
-    );
-  }, [tabs]);
+    setConfirmRequest({
+      title: t('app.confirmCloseDirtyTitle'),
+      body: t('app.confirmCloseDirty', { count: dirty.length, list }),
+      action,
+    });
+  }, [t]);
 
-  const handleCloseWorkspace = useCallback(async () => {
-    if (!confirmDiscardDirty()) return;
+  const performCloseWorkspace = useCallback(async () => {
     await closeWorkspace();
     setTabs([]);
     setActiveTabIndex(0);
-  }, [closeWorkspace, confirmDiscardDirty]);
+  }, [closeWorkspace]);
 
-  const wrappedOpenLocal = useCallback(async (path: string) => {
-    if (!confirmDiscardDirty()) return false;
+  const handleCloseWorkspace = useCallback(() => {
+    runAfterDirtyConfirm(() => { void performCloseWorkspace(); });
+  }, [runAfterDirtyConfirm, performCloseWorkspace]);
+
+  const performOpenLocal = useCallback(async (path: string) => {
     const ok = await openLocal(path);
     if (ok) { setTabs([]); setActiveTabIndex(0); }
     return ok;
-  }, [openLocal, confirmDiscardDirty]);
+  }, [openLocal]);
 
-  const wrappedClone = useCallback(async (url: string, target?: string) => {
-    if (!confirmDiscardDirty()) return false;
+  const performClone = useCallback(async (url: string, target?: string) => {
     const ok = await cloneGit(url, target);
     if (ok) { setTabs([]); setActiveTabIndex(0); }
     return ok;
-  }, [cloneGit, confirmDiscardDirty]);
+  }, [cloneGit]);
+
+  const wrappedOpenLocal = useCallback(async (path: string) => {
+    if (tabsRef.current.some(t => t.dirty)) {
+      // Подтверждение через диалог: пикер остаётся открытым, закрываем его после успешного открытия
+      runAfterDirtyConfirm(() => {
+        void performOpenLocal(path).then(ok => { if (ok) setPickerOpen(false); });
+      });
+      return false;
+    }
+    return performOpenLocal(path);
+  }, [performOpenLocal, runAfterDirtyConfirm]);
+
+  const wrappedClone = useCallback(async (url: string, target?: string) => {
+    if (tabsRef.current.some(t => t.dirty)) {
+      runAfterDirtyConfirm(() => {
+        void performClone(url, target).then(ok => { if (ok) setPickerOpen(false); });
+      });
+      return false;
+    }
+    return performClone(url, target);
+  }, [performClone, runAfterDirtyConfirm]);
 
   // ---- Unsaved-changes dialog handlers ----
   const handleDialogSave = useCallback(async (): Promise<string | null> => {
@@ -336,18 +387,22 @@ export default function App() {
   }, []);
 
   const handleApplyFix = useCallback((violation: Violation) => {
-    const context = activeTab ? `Файл: ${activeTab.path}\n\n${activeTab.content}` : undefined;
+    const context = activeTab ? t('app.chatContextFile', { path: activeTab.path, content: activeTab.content }) : undefined;
     sendMessage(
-      `Предложи конкретное исправление для нарушения "${violation.rule_description}" на строке ${violation.line_start}: ${violation.explanation}`,
+      t('app.fixViolationPrompt', {
+        rule: violation.rule_description,
+        line: violation.line_start,
+        explanation: violation.explanation,
+      }),
       context,
     );
     setAiView('chat');
-  }, [activeTab, sendMessage]);
+  }, [activeTab, sendMessage, t]);
 
   const handleSendMessage = useCallback((text: string) => {
-    const context = activeTab ? `Файл: ${activeTab.path}\n\n${activeTab.content}` : undefined;
+    const context = activeTab ? t('app.chatContextFile', { path: activeTab.path, content: activeTab.content }) : undefined;
     sendMessage(text, context);
-  }, [activeTab, sendMessage]);
+  }, [activeTab, sendMessage, t]);
 
   // ---- Reset analysis data per active AI view ----
   const handleResetData = useCallback(() => {
@@ -371,10 +426,14 @@ export default function App() {
           setSaveToast({ kind: 'err', text: t('app.noResultsToReset') });
           return;
         }
-        if (window.confirm(t('app.confirmClearAll', { count }))) {
-          clearAllResults();
-          setSaveToast({ kind: 'ok', text: t('app.allResultsReset') });
-        }
+        setConfirmRequest({
+          title: t('app.confirmClearAllTitle'),
+          body: t('app.confirmClearAll', { count }),
+          action: () => {
+            clearAllResults();
+            setSaveToast({ kind: 'ok', text: t('app.allResultsReset') });
+          },
+        });
         break;
       }
       case 'chat': {
@@ -382,9 +441,11 @@ export default function App() {
           setSaveToast({ kind: 'err', text: t('app.chatHistoryEmpty') });
           return;
         }
-        if (window.confirm(t('app.confirmClearChat'))) {
-          clearMessages();
-        }
+        setConfirmRequest({
+          title: t('app.confirmClearChatTitle'),
+          body: t('app.confirmClearChat'),
+          action: () => clearMessages(),
+        });
         break;
       }
       case 'review': {
@@ -403,16 +464,9 @@ export default function App() {
     }
   }, [aiView, activeTab, resultsByFile, messages, reviewState, clearFileResult, clearAllResults, clearMessages, clearReview]);
 
-  // Auto-open picker on first load when no workspace and backend is online
-  // (commented out — let user see empty state instead)
-  // useEffect(() => {
-  //   if (backendOnline && !workspace && recent.length === 0) setPickerOpen(true);
-  // }, [backendOnline, workspace, recent.length]);
-
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Header
-        contextHealth={85}
         workspace={workspace}
         onAnalyzeProject={handleAnalyzeProject}
         analyzing={analyzing}
@@ -481,6 +535,8 @@ export default function App() {
           onTabClose={closeFile}
           onContentChange={handleContentChange}
           onCreateRule={handleCreateRule}
+          onAnalyzeFile={handleAnalyzeFile}
+          analyzing={analyzing}
         />
 
         <AIPanel
@@ -502,26 +558,9 @@ export default function App() {
           onReviewFile={handleReviewFile}
           onReviewChanges={handleReviewChanges}
           onOpenFile={openFile}
+          onOpenReport={() => setReportOpen(true)}
+          reportCount={Object.keys(resultsByFile).length}
         />
-
-        {/* Floating "Summary report" button — inside main content area */}
-        <button
-          onClick={() => setReportOpen(true)}
-          disabled={Object.keys(resultsByFile).length === 0}
-          className="absolute bottom-24 right-[336px] bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full p-3 shadow-2xl transition-all z-10 flex items-center justify-center"
-          title={
-            Object.keys(resultsByFile).length === 0
-              ? t('app.reportNeedAnalysis')
-              : t('app.reportButtonTitle', { count: Object.keys(resultsByFile).length })
-          }
-        >
-          <FontAwesomeIcon icon={faChartBar} className="text-lg" />
-          {Object.keys(resultsByFile).length > 0 && (
-            <span className="ml-2 text-[10px] font-bold bg-white/20 px-1.5 rounded">
-              {Object.keys(resultsByFile).length}
-            </span>
-          )}
-        </button>
       </div>
 
       <StatusBar
@@ -531,16 +570,7 @@ export default function App() {
         activeFile={activeTab?.path ?? null}
       />
 
-      <AnalysisOverlay visible={analyzing} progress={progress} stepLabel={stepLabel} />
-
-      <button
-        onClick={handleAnalyzeFile}
-        disabled={analyzing || !activeTab}
-        className="fixed bottom-10 right-[336px] bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full p-4 shadow-2xl pulse-ring transition-all z-10"
-        title={activeTab ? t('app.analyzeFileTitle', { name: activeTab.name }) : t('app.analyzeOpenFileFirst')}
-      >
-        <FontAwesomeIcon icon={faWandMagicSparkles} className="text-xl" />
-      </button>
+      <AnalysisOverlay visible={analyzing} progress={progress} stepLabel={stepLabel} onCancel={cancelAnalysis} />
 
       {pickerOpen && (
         <WorkspacePicker
@@ -593,15 +623,32 @@ export default function App() {
         />
       )}
 
+      {confirmRequest && (
+        <ConfirmDialog
+          title={confirmRequest.title}
+          body={confirmRequest.body}
+          onConfirm={() => {
+            const action = confirmRequest.action;
+            setConfirmRequest(null);
+            action();
+          }}
+          onCancel={() => setConfirmRequest(null)}
+        />
+      )}
+
       {saveToast && (
         <div
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-xs z-[300] border ${
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-xs z-(--z-toast) border flex items-center ${
             saveToast.kind === 'ok'
-              ? 'bg-green-900/90 border-green-500/50 text-green-300'
-              : 'bg-red-900/90 border-red-500/50 text-red-300'
+              ? 'bg-bg-overlay border-success/50 text-success'
+              : 'bg-bg-overlay border-danger/50 text-danger'
           }`}
         >
-          {saveToast.kind === 'ok' ? '✓ ' : '⚠️ '}{saveToast.text}
+          <FontAwesomeIcon
+            icon={saveToast.kind === 'ok' ? faCheckCircle : faExclamationTriangle}
+            className="mr-1.5"
+          />
+          {saveToast.text}
         </div>
       )}
     </div>

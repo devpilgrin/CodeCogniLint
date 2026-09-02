@@ -3,7 +3,8 @@ services:
   codecognilint:
     build: .
     ports:
-      - "8000:8000"
+      # только localhost: у API нет встроенной auth — не публикуем в LAN
+      - "127.0.0.1:8000:8000"
     # LLM-настройки и токен git — через env (или примонтируйте свой .env):
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
@@ -12,6 +13,13 @@ services:
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-1.0}
       # LLM_API_KEY: ...
       # GIT_TOKEN: ...
+      # CCL_API_KEY: ...  (если задан — мутирующие запросы требуют X-API-Key)
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     # Сканировать проекты хоста: монтируйте их в контейнер
     # volumes:
     #   - /path/to/your/projects:/projects:ro

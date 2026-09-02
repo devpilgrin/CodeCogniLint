@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown, faChevronRight, faFolder, faFolderOpen,
-  faFileCode, faFileLines,
+  faFileCode, faFileLines, faRobot,
 } from '@fortawesome/free-solid-svg-icons';
 import { faJsSquare, faReact, faPython, faHtml5, faCss3, faMarkdown } from '@fortawesome/free-brands-svg-icons';
 import type { TreeNode } from '../types';
@@ -21,10 +21,10 @@ function fileIcon(lang?: string) {
   if (lang === 'python') return <FontAwesomeIcon icon={faPython} className="text-blue-300" />;
   if (lang === 'html') return <FontAwesomeIcon icon={faHtml5} className="text-orange-400" />;
   if (lang === 'css' || lang === 'scss' || lang === 'less') return <FontAwesomeIcon icon={faCss3} className="text-blue-500" />;
-  if (lang === 'markdown') return <FontAwesomeIcon icon={faMarkdown} className="text-gray-400" />;
+  if (lang === 'markdown') return <FontAwesomeIcon icon={faMarkdown} className="text-text-secondary" />;
   if (lang === 'json' || lang === 'yaml' || lang === 'toml') return <FontAwesomeIcon icon={faFileCode} className="text-yellow-300" />;
-  if (lang === 'plaintext') return <FontAwesomeIcon icon={faFileLines} className="text-gray-500" />;
-  return <FontAwesomeIcon icon={faFileCode} className="text-gray-400" />;
+  if (lang === 'plaintext') return <FontAwesomeIcon icon={faFileLines} className="text-text-muted" />;
+  return <FontAwesomeIcon icon={faFileCode} className="text-text-secondary" />;
 }
 
 interface NodeProps extends Props {
@@ -50,9 +50,12 @@ function TreeItem({ node, level, expanded, onToggle, activeFile, resultsByFile, 
   return (
     <div>
       <div
+        role="treeitem"
+        aria-expanded={isDir ? isExpanded : undefined}
+        aria-selected={isActive}
         onClick={() => isDir ? onToggle(node.path) : onFileOpen(node.path)}
         className={`group flex items-center cursor-pointer py-0.5 text-xs transition-colors ${
-          isActive ? 'bg-blue-500/15 text-blue-300' : 'text-gray-400 hover:bg-[#21262d]'
+          isActive ? 'bg-blue-500/15 text-blue-300' : 'text-text-secondary hover:bg-bg-overlay'
         }`}
         style={{ paddingLeft: `${8 + level * 12}px`, paddingRight: '8px' }}
         title={node.path || node.name}
@@ -60,20 +63,21 @@ function TreeItem({ node, level, expanded, onToggle, activeFile, resultsByFile, 
         {isDir ? (
           <FontAwesomeIcon
             icon={isExpanded ? faChevronDown : faChevronRight}
-            className="mr-1 text-[8px] text-gray-500 w-2"
+            className="mr-1 text-[11px] text-text-muted w-2"
           />
         ) : (
           <span className="mr-1 w-2 inline-block" />
         )}
         <span className="mr-1.5 w-3.5 text-center">
           {isDir
-            ? <FontAwesomeIcon icon={isExpanded ? faFolderOpen : faFolder} className="text-blue-400 text-[11px]" />
+            ? <FontAwesomeIcon icon={isExpanded ? faFolderOpen : faFolder} className="text-blue-400 text-xs" />
             : fileIcon(node.language)}
         </span>
         <span className="truncate flex-1">{node.name}</span>
         {count > 0 && (
-          <span className="text-[9px] text-orange-400 bg-orange-400/10 px-1 rounded ml-1">
-            🤖 {count}
+          <span className="text-[11px] text-orange-400 bg-orange-400/10 px-1 rounded ml-1 flex items-center">
+            <FontAwesomeIcon icon={faRobot} className="mr-1 text-[9px]" />
+            {count}
           </span>
         )}
       </div>
@@ -118,9 +122,9 @@ export function FileTree(props: Props) {
   }, []);
 
   return (
-    <div className="select-none">
+    <div className="select-none" role="tree">
       {root.truncated && (
-        <div className="px-2 py-1 mx-2 my-1 bg-yellow-500/10 border border-yellow-500/30 rounded text-[10px] text-yellow-400">
+        <div className="px-2 py-1 mx-2 my-1 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs text-yellow-400">
           {t('filetree.truncated')}
         </div>
       )}

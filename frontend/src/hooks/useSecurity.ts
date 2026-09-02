@@ -1,21 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
-import axios from 'axios';
-import { securityApi } from '../services/api';
+import { securityApi, apiErrorMessage } from '../services/api';
 import type { SecurityReport, SecurityBaselineInfo } from '../types';
 import { useI18n } from '../i18n';
 
-function errText(e: unknown, offline: string): string {
-  if (axios.isAxiosError(e)) {
-    const detail = (e.response?.data as { detail?: string } | undefined)?.detail;
-    if (detail) return detail;
-    if (e.code === 'ERR_NETWORK') return offline;
-    return e.message;
-  }
-  return e instanceof Error ? e.message : String(e);
-}
-
 export function useSecurity(workspacePath: string | null) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [tools, setTools] = useState<Record<string, boolean> | null>(null);
   const [report, setReport] = useState<SecurityReport | null>(null);
   const [baseline, setBaseline] = useState<SecurityBaselineInfo | null>(null);
@@ -42,7 +31,7 @@ export function useSecurity(workspacePath: string | null) {
       const r = await securityApi.scan(verify);
       setReport(r);
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
     } finally {
       setScanning(false);
     }
@@ -55,7 +44,7 @@ export function useSecurity(workspacePath: string | null) {
       setBaseline(b);
       if (report) setReport({ ...report, baseline: b, diff: { new: 0, fixed: 0, fixed_list: [] } });
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
     } finally {
       setBusyBaseline(false);
     }
@@ -68,7 +57,7 @@ export function useSecurity(workspacePath: string | null) {
       setBaseline(null);
       if (report) setReport({ ...report, baseline: null });
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
     } finally {
       setBusyBaseline(false);
     }
@@ -84,7 +73,7 @@ export function useSecurity(workspacePath: string | null) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
     }
   }, []);
 
@@ -105,7 +94,7 @@ export function useSecurity(workspacePath: string | null) {
         const data = JSON.parse((ev as MessageEvent).data);
         if (data.report) {
           setReport(data.report);
-          setLastWatchScan(new Date().toLocaleTimeString('ru-RU'));
+          setLastWatchScan(new Date().toLocaleTimeString(locale));
         }
       } catch { /* битый пакет — пропускаем */ }
     });
@@ -114,7 +103,7 @@ export function useSecurity(workspacePath: string | null) {
       es.close();
     });
     return () => es.close();
-  }, [watching, workspacePath]);
+  }, [watching, workspacePath, locale]);
 
   const toggleWatch = useCallback(() => setWatching(w => !w), []);
 

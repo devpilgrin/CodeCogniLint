@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { AnalysisResult, ChatMessage } from '../types';
-import { analysisApi } from '../services/api';
+import { analysisApi, apiErrorMessage } from '../services/api';
 import { useI18n } from '../i18n';
 
 const STEP_KEYS = [
@@ -8,7 +8,7 @@ const STEP_KEYS = [
   'analysis.step2',
   'analysis.step3',
   'analysis.step4',
-];
+] as const;
 
 export function useAnalysis() {
   const { t } = useI18n();
@@ -56,7 +56,8 @@ export function useAnalysis() {
       currentProgress = Math.min(currentProgress + Math.random() * 18 + 2, 90);
       const idx = Math.min(Math.floor((currentProgress / 90) * STEP_KEYS.length), STEP_KEYS.length - 1);
       setProgress(currentProgress);
-      setStepLabel(t(STEP_KEYS[idx]));
+      const stepKey = STEP_KEYS[idx];
+      if (stepKey) setStepLabel(t(stepKey));
     }, 350);
 
     try {
@@ -72,13 +73,15 @@ export function useAnalysis() {
       setMessages(prev => [...prev, {
         role: 'assistant', content: msg, timestamp: new Date().toISOString(),
       }]);
-    } catch {
+    } catch (e) {
       clearProgress();
       setProgress(100);
+      // Различаем сетевую ошибку (бэкенд офлайн/таймаут) и HTTP-ошибку бэкенда (detail из ответа)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: t('err.backendOfflineRetry'),
+        content: apiErrorMessage(e, t('err.backendOfflineRetry')),
         timestamp: new Date().toISOString(),
+        isError: true,
       }]);
     } finally {
       setTimeout(() => { setAnalyzing(false); setProgress(0); }, 600);
@@ -100,7 +103,7 @@ export function useAnalysis() {
     let totalFiles = 0;
     let streamFinished = false;
 
-    const finish = (assistantMsg: string, keepOverlayBriefly = false) => {
+    const finish = (assistantMsg: string, keepOverlayBriefly = false, isError = false) => {
       streamFinished = true;
       closeStream();
       if (assistantMsg) {
@@ -108,6 +111,7 @@ export function useAnalysis() {
           role: 'assistant',
           content: assistantMsg,
           timestamp: new Date().toISOString(),
+          ...(isError ? { isError: true } : {}),
         }]);
       }
       if (keepOverlayBriefly) {
@@ -149,11 +153,11 @@ export function useAnalysis() {
         }
 
         case 'aborted':
-          finish(t('analysis.aborted', { index: String(data.index ?? '?'), total: String(data.total ?? '?'), error: String(data.error) }));
+          finish(t('analysis.aborted', { index: String(data.index ?? '?'), total: String(data.total ?? '?'), error: String(data.error) }), false, true);
           break;
 
         case 'error':
-          finish(t('analysis.scanError', { error: String(data.error) }));
+          finish(t('analysis.scanError', { error: String(data.error) }), false, true);
           break;
       }
     };
@@ -161,7 +165,7 @@ export function useAnalysis() {
     es.onerror = () => {
       // EventSource fires onerror when stream closes normally too.
       if (streamFinished) return;
-      finish(t('analysis.connectionLost'));
+      finish(t('analysis.connectionLost'), false, true);
     };
   }, [t]);
 
@@ -173,21 +177,28 @@ export function useAnalysis() {
   }, []);
 
   // ---------- Chat ----------
+  // ref на актуальный список сообщений — читаем messages без вызова API внутри апдейтера setState (StrictMode двойно вызывает апдейтеры; вынесено в ref + обычные setState вне апдейтера.
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const sendMessage = useCallback(async (text: string, context?: string) => {
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: new Date().toISOString() };
-    setMessages(prev => {
-      const updated = [...prev, userMsg];
-      analysisApi.chat(updated, context).then(reply => {
-        setMessages(cur => [...cur, reply]);
-      }).catch(() => {
-        setMessages(cur => [...cur, {
-          role: 'assistant',
-          content: t('err.backendOffline'),
-          timestamp: new Date().toISOString(),
-        }]);
-      });
-      return updated;
-    });
+    // 1) сначала обновляем состояние
+    const updated = [...messagesRef.current, userMsg];
+    messagesRef.current = updated;
+    setMessages(updated);
+    // 2) затем вызов API с актуальным списком — побочный эффект вне апдейтера setState
+    try {
+      const reply = await analysisApi.chat(updated, context);
+      setMessages(cur => [...cur, reply]);
+    } catch (e) {
+      setMessages(cur => [...cur, {
+        role: 'assistant',
+        content: apiErrorMessage(e, t('err.backendOffline')),
+        timestamp: new Date().toISOString(),
+        isError: true,
+      }]);
+    }
   }, [t]);
 
   const clearFileResult = useCallback((path: string) => {

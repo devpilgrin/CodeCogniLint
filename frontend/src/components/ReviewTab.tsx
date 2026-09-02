@@ -2,10 +2,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faClipboardCheck, faSpinner, faArrowRight, faLightbulb,
   faThumbsUp, faFileCode, faCodeBranch, faTriangleExclamation,
+  faCheckCircle, faCommentDots, faCircleXmark,
+  type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ReviewResult, ReviewIssue, ReviewVerdict } from '../types';
 import type { ReviewMode, ReviewState } from '../hooks/useReview';
 import { useI18n } from '../i18n';
+import { severityBadge } from './ui/severity';
+import { EmptyState } from './ui/EmptyState';
 
 interface Props {
   reviewing: ReviewMode | null;
@@ -25,10 +29,10 @@ const verdictStyle: Record<ReviewVerdict, string> = {
   request_changes: 'bg-red-500/15 border-red-500/40 text-red-400',
 };
 
-const severityBadge: Record<ReviewIssue['severity'], string> = {
-  critical: 'text-orange-400 bg-orange-400/10',
-  warning: 'text-yellow-400 bg-yellow-400/10',
-  info: 'text-blue-400 bg-blue-400/10',
+const verdictIcon: Record<ReviewVerdict, IconDefinition> = {
+  approve: faCheckCircle,
+  comment: faCommentDots,
+  request_changes: faCircleXmark,
 };
 
 function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile, t }: {
@@ -48,33 +52,33 @@ function IssueCard({ issue, filePath, activeFilePath, onJumpToLine, onOpenFile, 
   };
   return (
     <div
-      className="border border-[#30363d] rounded-lg p-3 space-y-2 cursor-pointer bg-[#0d1117] hover:border-blue-500/40 transition-colors"
+      className="border border-border-default rounded-lg p-3 space-y-2 cursor-pointer bg-bg-canvas hover:border-blue-500/40 transition-colors"
       onClick={handleJump}
       title={filePath === activeFilePath ? t('review.jumpToLine') : t('review.openFile', { path: filePath })}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-1">
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${severityBadge[issue.severity]}`}>
+          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${severityBadge[issue.severity]}`}>
             {t(`sev.${issue.severity}`)}
           </span>
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-gray-400 bg-gray-400/10">
+          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded text-text-secondary bg-gray-400/10">
             {t(`reviewcat.${issue.category}`)}
           </span>
         </div>
-        <span className="text-[10px] text-gray-500 flex items-center">
+        <span className="text-xs text-text-muted flex items-center">
           {t('review.line', { line: issue.line_start })}{issue.line_end !== issue.line_start ? `–${issue.line_end}` : ''}
-          <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[8px]" />
+          <FontAwesomeIcon icon={faArrowRight} className="ml-1 text-[11px]" />
         </span>
       </div>
-      <p className="text-[11px] text-gray-200 font-semibold leading-snug">{issue.title}</p>
+      <p className="text-xs text-gray-200 font-semibold leading-snug">{issue.title}</p>
       {issue.code_snippet && (
-        <pre className="text-[10px] code-font bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-gray-300 overflow-x-auto custom-scrollbar whitespace-pre">
+        <pre className="text-xs code-font bg-bg-surface border border-border-default rounded px-2 py-1 text-text-primary overflow-x-auto custom-scrollbar whitespace-pre">
           {issue.code_snippet}
         </pre>
       )}
-      <p className="text-[11px] text-gray-400 leading-relaxed">{issue.description}</p>
+      <p className="text-xs text-text-secondary leading-relaxed">{issue.description}</p>
       {issue.suggestion && (
-        <div className="flex items-start space-x-1 text-[10px] text-green-300/80 leading-relaxed">
+        <div className="flex items-start space-x-1 text-xs text-green-300/80 leading-relaxed">
           <FontAwesomeIcon icon={faLightbulb} className="mt-0.5 flex-shrink-0" />
           <span>{issue.suggestion}</span>
         </div>
@@ -96,18 +100,19 @@ function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, sho
       {showPath && (
         <button
           onClick={() => onOpenFile(review.file_path)}
-          className="w-full text-left text-[10px] text-blue-400 hover:text-blue-300 code-font truncate"
+          className="w-full text-left text-xs text-blue-400 hover:text-blue-300 code-font truncate"
           title={t('review.openFile', { path: review.file_path })}
         >
           <FontAwesomeIcon icon={faFileCode} className="mr-1" />
           {review.file_path}
         </button>
       )}
-      <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${verdictStyle[review.verdict]}`}>
+      <div className={`border rounded-lg px-2.5 py-2 text-xs font-bold flex items-center ${verdictStyle[review.verdict]}`}>
+        <FontAwesomeIcon icon={verdictIcon[review.verdict]} className="mr-1.5" />
         {t(`verdict.${review.verdict}`)}
       </div>
       {review.summary && (
-        <p className="text-[11px] text-gray-400 leading-relaxed px-1">{review.summary}</p>
+        <p className="text-xs text-text-secondary leading-relaxed px-1">{review.summary}</p>
       )}
       {review.issues.map((issue, i) => (
         <IssueCard
@@ -122,11 +127,11 @@ function FileReviewBlock({ review, activeFilePath, onJumpToLine, onOpenFile, sho
       ))}
       {review.positives.length > 0 && (
         <div className="border border-green-500/20 bg-green-500/5 rounded-lg p-2.5 space-y-1">
-          <div className="text-[9px] font-bold text-green-400 uppercase flex items-center">
+          <div className="text-[11px] font-bold text-green-400 uppercase flex items-center">
             <FontAwesomeIcon icon={faThumbsUp} className="mr-1" /> {t('review.strengths')}
           </div>
           {review.positives.map((p, i) => (
-            <p key={i} className="text-[10px] text-gray-400 leading-relaxed">· {p}</p>
+            <p key={i} className="text-xs text-text-secondary leading-relaxed">· {p}</p>
           ))}
         </div>
       )}
@@ -142,7 +147,7 @@ export function ReviewTab({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Actions */}
-      <div className="p-3 space-y-1.5 border-b border-[#30363d] flex-shrink-0">
+      <div className="p-3 space-y-1.5 border-b border-border-default flex-shrink-0">
         <button
           onClick={onReviewFile}
           disabled={reviewing !== null || !activeFilePath}
@@ -170,7 +175,7 @@ export function ReviewTab({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
         {error && (
-          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-2.5 text-[11px] text-red-400 flex items-start">
+          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-2.5 text-xs text-red-400 flex items-start">
             <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1.5 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
@@ -189,12 +194,13 @@ export function ReviewTab({
 
         {!error && (state.mode === 'changes' || state.mode === 'commit') && state.changes && (
           <div className="space-y-3">
-            <div className={`border rounded-lg px-2.5 py-2 text-[11px] font-bold ${verdictStyle[state.changes.overall_verdict]}`}>
+            <div className={`border rounded-lg px-2.5 py-2 text-xs font-bold flex items-center ${verdictStyle[state.changes.overall_verdict]}`}>
+              <FontAwesomeIcon icon={verdictIcon[state.changes.overall_verdict]} className="mr-1.5" />
               {t(`verdict.${state.changes.overall_verdict}`)}
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed px-1">{state.changes.summary}</p>
+            <p className="text-xs text-text-secondary leading-relaxed px-1">{state.changes.summary}</p>
             {state.changes.files.map((review, i) => (
-              <div key={i} className="border-t border-[#30363d] pt-2">
+              <div key={i} className="border-t border-border-default pt-2">
                 <FileReviewBlock
                   review={review}
                   activeFilePath={activeFilePath}
@@ -209,17 +215,12 @@ export function ReviewTab({
         )}
 
         {!error && !state.file && !state.changes && !reviewing && (
-          <div className="flex-1 flex items-center justify-center p-6 text-center h-full">
-            <div>
-              <FontAwesomeIcon icon={faClipboardCheck} className="text-3xl text-gray-600 mb-2" />
-              <p className="text-xs text-gray-400 font-semibold mb-1">{t('review.agentTitle')}</p>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                {t('review.agentHint1')}<br />
-                {t('review.agentHint2')}<br />
-                {t('review.agentHint3')}
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            icon={faClipboardCheck}
+            title={t('review.agentTitle')}
+            hint={`${t('review.agentHint1')} ${t('review.agentHint2')} ${t('review.agentHint3')}`}
+            className="h-full"
+          />
         )}
       </div>
     </div>

@@ -8,7 +8,40 @@ import type {
   SecurityReport, SecurityBaselineInfo, PentestReport, AuditReport, QualityReport,
 } from '../types';
 
-const api = axios.create({ baseURL: '/api' });
+const api = axios.create({ baseURL: '/api', timeout: 30_000 });
+
+/**
+ * Response interceptor: нормализует ошибку в читаемое сообщение.
+ * HTTP-ошибка с detail из ответа бэкенда заменяет message на текст detail;
+ * сетевые ошибки (бэкенд офлайн/таймаут) не трогаем — их текст не локализуется здесь (см. apiErrorMessage).
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error)) {
+      const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail;
+      if (typeof detail === 'string' && detail) {
+        error.message = detail;
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
+/**
+ * Приводит любую ошибку запроса к читаемой строке: HTTP detail → сетевые/таймаут → offlineText, иначе detail из ответа, иначе message.
+ */
+export function apiErrorMessage(err: unknown, offlineText: string): string {
+  if (axios.isAxiosError(err)) {
+    const detail = (err.response?.data as { detail?: unknown } | undefined)?.detail;
+    if (typeof detail === 'string' && detail) return detail;
+    // ERR_NETWORK: бэкенд недоступен; ECONNABORTED: таймаут запроса.
+    if (err.response === undefined) return offlineText;
+    if (err instanceof Error && err.message) return err.message;
+    return offlineText;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
 
 export const rulesApi = {
   getAll: () => api.get<Rule[]>('/rules').then(r => r.data),

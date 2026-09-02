@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, StrictBool
@@ -115,7 +116,8 @@ async def git_create_pr(body: PrRequest):
     title, text = body.title.strip(), body.body.strip()
     if body.with_llm:
         try:
-            ctx = pr_context(ws_path, base=body.base)
+            # блокирующие git-вызовы — в thread, чтобы не вешать event loop
+            ctx = await asyncio.to_thread(pr_context, ws_path, base=body.base)
         except GitError as e:
             raise _git_error(e)
         user = (f"Ветка: {ctx['branch']} → {ctx['base']}\n\n"
@@ -137,6 +139,7 @@ async def git_create_pr(body: PrRequest):
                 raise HTTPException(status_code=503,
                                     detail="LLM недоступна — задайте заголовок PR вручную")
     try:
-        return create_pr(ws_path, title=title, body=text, base=body.base, token=body.token)
+        return await asyncio.to_thread(
+            create_pr, ws_path, title=title, body=text, base=body.base, token=body.token)
     except GitError as e:
         raise _git_error(e)

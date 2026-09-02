@@ -9,14 +9,18 @@ status "unavailable", отчёт собирается из доступных.
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
+import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from .llm_adapter import chat_completion, LLMError
 from .workspace_service import SKIP_DIRS, EXT_TO_LANG
@@ -335,6 +339,7 @@ def scan_sca(workspace: str) -> dict:
 
     cache = _load_sca_cache()
     new_cache: dict = {}
+    kept_cache: dict = {}  # актуальные cache-hit ключи — без них файл стирался бы
     cached_layers = 0
 
     req_by_dir, locks = _find_manifests(root)
@@ -345,6 +350,7 @@ def scan_sca(workspace: str) -> dict:
         if hit and hit.get("hash") == mh:
             findings.extend(hit.get("findings", []))
             notes.extend(hit.get("notes", []))
+            kept_cache[key] = hit
             cached_layers += 1
         else:
             f_new, n_new = [], []
@@ -361,6 +367,7 @@ def scan_sca(workspace: str) -> dict:
         if hit and hit.get("hash") == mh:
             findings.extend(hit.get("findings", []))
             notes.extend(hit.get("notes", []))
+            kept_cache[key] = hit
             cached_layers += 1
         else:
             f_new, n_new = [], []
@@ -370,9 +377,11 @@ def scan_sca(workspace: str) -> dict:
             new_cache[key] = {"hash": mh, "findings": f_new, "notes": n_new}
 
     has_manifests = bool(req_by_dir or locks)
-    # кэш держим только для текущих ключей (устаревшие workspace вымываются)
+    # кэш держим только для текущих ключей (устаревшие workspace вымываются);
+    # объединяем пересчитанные и живые cache-hit ключи — иначе при полном
+    # cache-hit на диск уходил пустой dict и кэш стирался
     if new_cache or cached_layers:
-        _save_sca_cache(new_cache)
+        _save_sca_cache({**kept_cache, **new_cache})
     if cached_layers:
         notes.append(f"SCA-кэш: {cached_layers} слоёв без изменений (манифесты не менялись)")
 
@@ -570,6 +579,10 @@ def _fingerprint(f: dict) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+# read-modify-write baselines под одной блокировкой (гонки между запросами)
+_BASELINE_LOCK = threading.Lock()
+
+
 def _load_baselines() -> dict:
     if not BASELINES_FILE.exists():
         return {}
@@ -589,6 +602,7 @@ def _current_head(workspace: str) -> Optional[str]:
         repo = _repo(workspace)
         return repo.head.commit.hexsha[:7] if repo.head.is_valid() else None
     except Exception:
+        logger.exception("Не удалось определить HEAD для baseline: %s", workspace)
         return None
 
 
@@ -600,9 +614,10 @@ def get_baseline(workspace: str) -> Optional[dict]:
 
 
 def delete_baseline(workspace: str) -> dict:
-    data = _load_baselines()
-    removed = data.pop(str(Path(workspace).expanduser().resolve()), None)
-    _save_baselines(data)
+    with _BASELINE_LOCK:
+        data = _load_baselines()
+        removed = data.pop(str(Path(workspace).expanduser().resolve()), None)
+        _save_baselines(data)
     return {"removed": removed is not None}
 
 
@@ -615,14 +630,16 @@ def save_baseline(workspace: str, report: dict) -> dict:
         }
         for f in report["findings"] if not f.get("suppressed")
     }
-    data = _load_baselines()
-    data[key] = {
-        "head": _current_head(workspace),
-        "created_at": datetime.now().isoformat(timespec="seconds"),
-        "items": items,
-    }
-    _save_baselines(data)
-    return {"head": data[key]["head"], "created_at": data[key]["created_at"], "findings": len(items)}
+    with _BASELINE_LOCK:
+        data = _load_baselines()
+        data[key] = {
+            "head": _current_head(workspace),
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "items": items,
+        }
+        _save_baselines(data)
+        entry = data[key]
+    return {"head": entry["head"], "created_at": entry["created_at"], "findings": len(items)}
 
 
 def _apply_baseline_diff(workspace: str, report: dict) -> None:
@@ -714,11 +731,14 @@ async def scan_workspace(workspace: str, verify: bool = False) -> dict:
     )
 
     all_findings = semgrep_res["findings"] + secrets_res["findings"] + sca_res["findings"]
-    all_findings = _apply_suppression(workspace, all_findings)
+    all_findings = await asyncio.to_thread(_apply_suppression, workspace, all_findings)
 
     active = [f for f in all_findings if not f.get("suppressed")]
     if verify and active:
-        all_findings = await verify_findings(workspace, active)
+        # verify_findings мутирует находки in-place; возвращаемый список —
+        # только active, поэтому НЕ перезаписываем all_findings: suppressed-
+        # находки должны остаться в отчёте и в summary.suppressed
+        await verify_findings(workspace, active)
 
     all_findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], f["path"], f["line_start"]))
 
@@ -735,6 +755,9 @@ async def scan_workspace(workspace: str, verify: bool = False) -> dict:
         if f["verification"]["status"] == "confirmed":
             confirmed += 1
 
+    coverage = await asyncio.to_thread(
+        collect_coverage, workspace, semgrep_res.get("scanned", 0))
+
     report = {
         "tools": tools_status(),
         "layers": {
@@ -742,7 +765,7 @@ async def scan_workspace(workspace: str, verify: bool = False) -> dict:
             "secrets": {k: v for k, v in secrets_res.items() if k != "findings"} | {"count": len(secrets_res["findings"])},
             "sca": {k: v for k, v in sca_res.items() if k != "findings"} | {"count": len(sca_res["findings"])},
         },
-        "coverage": collect_coverage(workspace, semgrep_res.get("scanned", 0)),
+        "coverage": coverage,
         "summary": {
             "total": len(active),
             "suppressed": suppressed_n,

@@ -6,13 +6,14 @@
 вердикт (approve / comment / request_changes), отмечает не только проблемы,
 но и сильные стороны кода.
 """
+import asyncio
 import json
 from pathlib import Path
 from typing import Optional
 
 from .llm_adapter import chat_completion, LLMError
 from .analysis_service import _extract_json, _with_line_numbers, _correct_violation_lines
-from .git_service import status as git_status, diff as git_diff, GitError
+from .git_service import status as git_status, diff as git_diff, validate_sha, GitError
 
 REVIEWER_SYSTEM_PROMPT = """Ты — старший инженер, проводящий код-ревью (code review).
 Твой стиль — как у внимательного ревьюера на pull request:
@@ -148,7 +149,7 @@ async def review_changes(workspace: str) -> dict:
     с diff-контекстом + сводный вердикт.
     """
     try:
-        st = git_status(workspace)
+        st = await asyncio.to_thread(git_status, workspace)
     except GitError as e:
         raise GitError(str(e))
 
@@ -212,7 +213,8 @@ async def review_commit(workspace: str, sha: str) -> dict:
     """
     from .git_service import commit_show, file_at
 
-    meta = commit_show(workspace, sha)
+    sha = validate_sha(sha)
+    meta = await asyncio.to_thread(commit_show, workspace, sha)
     files = meta["files"][:MAX_CHANGES_FILES]
 
     if not files:

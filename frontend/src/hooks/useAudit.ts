@@ -1,18 +1,7 @@
 import { useState, useCallback } from 'react';
-import axios from 'axios';
-import { auditApi } from '../services/api';
+import { auditApi, apiErrorMessage } from '../services/api';
 import type { AuditReport } from '../types';
 import { useI18n } from '../i18n';
-
-function errText(e: unknown, offline: string): string {
-  if (axios.isAxiosError(e)) {
-    const detail = (e.response?.data as { detail?: string } | undefined)?.detail;
-    if (detail) return detail;
-    if (e.code === 'ERR_NETWORK') return offline;
-    return e.message;
-  }
-  return e instanceof Error ? e.message : String(e);
-}
 
 export function useAudit(workspacePath: string | null) {
   const { t } = useI18n();
@@ -28,7 +17,7 @@ export function useAudit(workspacePath: string | null) {
       const r = await auditApi.run(verify);
       setReport(r);
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
     } finally {
       setRunning(false);
     }
@@ -52,7 +41,7 @@ export function useAudit(workspacePath: string | null) {
       URL.revokeObjectURL(url);
       return true;
     } catch (e) {
-      setError(errText(e, t('err.backendOfflineShort')));
+      setError(apiErrorMessage(e, t('err.backendOfflineShort')));
       return false;
     }
   }, [report]);

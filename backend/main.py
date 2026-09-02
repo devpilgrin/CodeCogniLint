@@ -1,3 +1,6 @@
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -5,6 +8,17 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from routers import rules, analysis, settings, workspace, reports, gitops, review, security, pentest, audit, quality, watch
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Опциональный API-key периметр: если задана env CCL_API_KEY — все мутирующие
+# методы требуют заголовок X-API-Key. Без env — поведение прежнее (локальный dev).
+_API_KEY = os.environ.get("CCL_API_KEY")
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 app = FastAPI(title="CodeCogniLint API", version="1.0.0")
 
@@ -33,6 +47,21 @@ def _iter_routes(routes, prefix: str = ""):
             sub = getattr(r, "routes", None)
             if sub:
                 yield from _iter_routes(sub, prefix)
+
+
+@app.middleware("http")
+async def api_key_guard(request: Request, call_next):
+    """Проверка X-API-Key для мутирующих методов, когда задан CCL_API_KEY.
+
+    Защищает контур, если порт опубликован наружу (запись файлов, git push,
+    пентест). GET/HEAD/OPTIONS (чтение, CORS-preflight) не требуют ключа.
+    Если CCL_API_KEY не задан — middleware пропускает всё (локальный dev).
+    """
+    if _API_KEY and request.method in _MUTATING_METHODS:
+        if request.headers.get("x-api-key") != _API_KEY:
+            return JSONResponse({"detail": "Требуется заголовок X-API-Key"},
+                                status_code=401)
+    return await call_next(request)
 
 
 @app.middleware("http")

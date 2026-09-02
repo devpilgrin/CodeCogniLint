@@ -49,6 +49,7 @@ export const ru: Record<string, string> = {
   'common.delete': 'Удалить',
   'common.edit': 'Изменить',
   'common.create': 'Создать',
+  'common.confirm': 'Подтвердить',
 
   // AI-панель
   'ai.insights': 'AI Инсайты',
@@ -78,6 +79,7 @@ export const ru: Record<string, string> = {
   'ai.askFix': 'Спросить LLM об исправлении →',
   'ai.context': 'Контекст',
   'ai.chatPlaceholder': 'Спросить AI о коде...',
+  'ai.comingSoon': 'Скоро',
 
   // Severity-бейджи
   'sev.critical': 'КРИТИЧНО',
@@ -102,9 +104,9 @@ export const ru: Record<string, string> = {
   'review.agentHint3': 'к строкам и сильные стороны кода.',
 
   // Вердикты ревью
-  'verdict.approve': '✓ ОДОБРЕНО',
-  'verdict.comment': '💬 ЕСТЬ КОММЕНТАРИИ',
-  'verdict.request_changes': '✗ ТРЕБУЮТСЯ ПРАВКИ',
+  'verdict.approve': 'ОДОБРЕНО',
+  'verdict.comment': 'ЕСТЬ КОММЕНТАРИИ',
+  'verdict.request_changes': 'ТРЕБУЮТСЯ ПРАВКИ',
 
   // Категории замечаний ревью
   'reviewcat.bug': 'БАГ',
@@ -121,6 +123,7 @@ export const ru: Record<string, string> = {
   // Редактор
   'editor.openFileHint': 'Откройте файл из проводника',
   'editor.orCreateRule': 'или создайте правило из выделенного фрагмента',
+  'editor.suggestionPrefix': 'Рекомендация',
   'editor.unsaved': 'Несохранённые изменения',
   'editor.createRuleFromSelection': 'Создать правило из выделения',
 
@@ -164,6 +167,7 @@ export const ru: Record<string, string> = {
   'rules.stateActive': '● АКТИВНО',
   'rules.stateInactive': '○ ОТКЛ.',
   'rules.deleteConfirm': 'Удалить правило «{description}»?',
+  'rules.deleteConfirmTitle': 'Удаление правила',
   'rules.categorySyntax': 'Синтаксис',
   'rules.categorySemantic': 'Семантика',
   'rules.categoryAnalysis': 'Анализ',
@@ -335,10 +339,8 @@ export const ru: Record<string, string> = {
   'audit.agentUnavailable': 'Суб-агент недоступен: {error}',
   'audit.openFile': 'Открыть файл',
   'audit.falsePositive': 'Суб-агент считает ложным срабатыванием',
-  'audit.emptyLine1': 'Мульти-агентный аудит: детерминированный скан,',
-  'audit.emptyLine2': 'затем суб-агенты по доменам (инъекции, секреты,',
-  'audit.emptyLine3': 'криптография, конфигурация, зависимости)',
-  'audit.emptyLine4': 'и синтезатор с итоговым вердиктом.',
+  'audit.emptyTitle': 'Мульти-агентный аудит',
+  'audit.emptyLine1': 'Детерминированный скан, затем суб-агенты по доменам (инъекции, секреты, криптография, конфигурация, зависимости) и синтезатор с итоговым вердиктом.',
   'audit.sev.critical': 'КРИТ',
   'audit.sev.warning': 'ВАЖН',
   'audit.sev.info': 'ИНФО',
@@ -371,14 +373,17 @@ export const ru: Record<string, string> = {
   'app.fileNotInTabs': 'Файл не найден среди открытых табов',
   'app.saved': 'Сохранено: {name}',
   'app.confirmCloseDirty': 'Несохранённые изменения в {count} файлах:\n\n{list}\n\nПродолжить? Изменения будут потеряны.',
+  'app.confirmCloseDirtyTitle': 'Несохранённые изменения',
   'app.noActiveFile': 'Нет активного файла',
   'app.noDataToReset': 'Нет данных для сброса',
   'app.resultsReset': 'Результаты для {name} сброшены',
   'app.noResultsToReset': 'Нет результатов для сброса',
   'app.confirmClearAll': 'Удалить результаты анализа всех {count} файлов?',
+  'app.confirmClearAllTitle': 'Сброс результатов анализа',
   'app.allResultsReset': 'Все результаты анализа сброшены',
   'app.chatHistoryEmpty': 'История уже пустая',
   'app.confirmClearChat': 'Очистить историю чата?',
+  'app.confirmClearChatTitle': 'Очистка истории чата',
   'app.noReviewToReset': 'Нет результатов ревью для сброса',
   'app.reviewReset': 'Результаты ревью сброшены',
 
@@ -464,4 +469,8 @@ export const ru: Record<string, string> = {
   'app.reportButtonTitle': 'Сводный отчёт ({count} файлов)',
   'app.analyzeFileTitle': 'Анализировать текущий файл: {name}',
   'app.analyzeOpenFileFirst': 'Откройте файл для анализа',
+
+  // Контекст и промпт чата с AI (App.tsx)
+  'app.chatContextFile': 'Файл: {path}\n\n{content}',
+  'app.fixViolationPrompt': 'Предложи конкретное исправление для нарушения "{rule}" на строке {line}: {explanation}',
 };

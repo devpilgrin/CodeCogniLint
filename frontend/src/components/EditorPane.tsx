@@ -21,6 +21,8 @@ interface Props {
   onTabClose: (path: string) => void;
   onContentChange: (path: string, content: string) => void;
   onCreateRule: (code: string, category: RuleCategory) => void;
+  onAnalyzeFile: () => void;
+  analyzing: boolean;
 }
 
 export interface EditorPaneHandle {
@@ -34,8 +36,25 @@ function tabIcon(lang: string) {
   return null;
 }
 
+/** Кнопка «Анализ файла» в тулбаре табов (бывшая FAB). */
+function AnalyzeButton({ disabled, title, onClick }: { disabled: boolean; title: string; onClick: () => void }) {
+  return (
+    <div className="flex-shrink-0 flex items-center px-2 border-l border-border-default self-stretch">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={title}
+        title={title}
+        className="w-6 h-6 rounded flex items-center justify-center text-blue-400 hover:bg-bg-overlay hover:text-blue-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        <FontAwesomeIcon icon={faWandMagicSparkles} className="text-xs" />
+      </button>
+    </div>
+  );
+}
+
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
-  const { tabs, activeTabIndex, violations, onTabSelect, onTabClose, onContentChange, onCreateRule } = props;
+  const { tabs, activeTabIndex, violations, onTabSelect, onTabClose, onContentChange, onCreateRule, onAnalyzeFile, analyzing } = props;
   const { t } = useI18n();
 
   const CATEGORY_ITEMS: { value: RuleCategory; label: string; color: string }[] = [
@@ -87,50 +106,66 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
     editor.onDidChangeCursorPosition(() => setContextMenu(null));
   }, []);
 
-  // Sync violations → Monaco markers on the active model
-  useEffect(() => {
-    if (!editorReady) return;
+  // Sync violations → Monaco markers on the active model.
+  // violations читаем через ref — подписка на смену модели редактора читает актуальные нарушения
+  // без пересоздания подписки при каждом изменении violations.
+  const violationsRef = useRef<Violation[]>(violations);
+  useEffect(() => { violationsRef.current = violations; }, [violations]);
+  // t через ref: applyMarkers (useCallback с пустыми deps) читает актуальную локаль
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
+
+  const applyMarkers = useCallback(() => {
     const ed = editorRef.current;
     const mc = monacoRef.current;
     if (!ed || !mc) return;
+    const model = ed.getModel();
+    if (!model) return;
 
-    // Defer one tick so model has switched after tab change
-    const t = setTimeout(() => {
-      const model = ed.getModel();
-      if (!model) return;
+    const severityMap = {
+      critical: mc.MarkerSeverity.Error,
+      warning:  mc.MarkerSeverity.Warning,
+      info:     mc.MarkerSeverity.Info,
+    };
 
-      const severityMap = {
-        critical: mc.MarkerSeverity.Error,
-        warning:  mc.MarkerSeverity.Warning,
-        info:     mc.MarkerSeverity.Info,
+    const markers: monacoT.editor.IMarkerData[] = violationsRef.current.map(v => {
+      const startLine = Math.max(1, v.line_start);
+      const endLine = Math.max(startLine, v.line_end || startLine);
+      const safeEndLine = Math.min(endLine, model.getLineCount());
+      const messageParts = [
+        `[${v.category.toUpperCase()}] ${v.rule_description}`,
+        v.code_snippet ? `→ ${v.code_snippet}` : '',
+        v.explanation,
+        v.suggestion ? `${tRef.current('editor.suggestionPrefix')}: ${v.suggestion}` : '',
+      ].filter(Boolean);
+      return {
+        severity: severityMap[v.severity] ?? mc.MarkerSeverity.Info,
+        message: messageParts.join('\n\n'),
+        startLineNumber: startLine,
+        endLineNumber: safeEndLine,
+        startColumn: 1,
+        endColumn: model.getLineMaxColumn(safeEndLine),
+        source: 'Hybrid LLM',
       };
+    });
 
-      const markers: monacoT.editor.IMarkerData[] = violations.map(v => {
-        const startLine = Math.max(1, v.line_start);
-        const endLine = Math.max(startLine, v.line_end || startLine);
-        const safeEndLine = Math.min(endLine, model.getLineCount());
-        const messageParts = [
-          `[${v.category.toUpperCase()}] ${v.rule_description}`,
-          v.code_snippet ? `→ ${v.code_snippet}` : '',
-          v.explanation,
-          v.suggestion ? `💡 ${v.suggestion}` : '',
-        ].filter(Boolean);
-        return {
-          severity: severityMap[v.severity] ?? mc.MarkerSeverity.Info,
-          message: messageParts.join('\n\n'),
-          startLineNumber: startLine,
-          endLineNumber: safeEndLine,
-          startColumn: 1,
-          endColumn: model.getLineMaxColumn(safeEndLine),
-          source: 'Hybrid LLM',
-        };
-      });
+    mc.editor.setModelMarkers(model, 'hybrid-llm', markers);
+  }, []);
 
-      mc.editor.setModelMarkers(model, 'hybrid-llm', markers);
-    }, 30);
+  // Маркеры ставятся сразу при смене модели (переключение таба → новая модель Monaco) — без таймеров.
+  useEffect(() => {
+    if (!editorReady) return;
+    const ed = editorRef.current;
+    if (!ed) return;
+    const sub = ed.onDidChangeModel(() => applyMarkers());
+    applyMarkers();
+    return () => sub.dispose();
+  }, [editorReady, applyMarkers]);
 
-    return () => clearTimeout(t);
-  }, [violations, activeTabIndex, editorReady]);
+  // Re-apply when violations change for the current model
+  useEffect(() => {
+    if (editorReady) applyMarkers();
+  }, [violations, editorReady, applyMarkers]);
 
   const handleChange = (value: string | undefined) => {
     if (value === undefined || !tab) return;
@@ -140,9 +175,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
   // Empty state — no tabs open
   if (!tab) {
     return (
-      <main className="flex-1 flex flex-col bg-[#0d1117] relative min-w-0">
-        <div className="h-9 bg-[#161b22] border-b border-[#30363d] flex-shrink-0" />
-        <div className="flex-1 flex items-center justify-center text-gray-500">
+      <main className="flex-1 flex flex-col bg-bg-canvas relative min-w-0">
+        <div className="h-9 bg-bg-surface border-b border-border-default flex-shrink-0 flex items-stretch justify-end">
+          <AnalyzeButton disabled title={t('app.analyzeOpenFileFirst')} onClick={onAnalyzeFile} />
+        </div>
+        <div className="flex-1 flex items-center justify-center text-text-muted">
           <div className="text-center">
             <FontAwesomeIcon icon={faFolderOpen} className="text-5xl mb-3 opacity-40" />
             <p className="text-sm">{t('editor.openFileHint')}</p>
@@ -154,17 +191,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-[#0d1117] relative min-w-0" ref={containerRef}>
+    <main className="flex-1 flex flex-col bg-bg-canvas relative min-w-0" ref={containerRef}>
       {/* Tabs */}
-      <div className="h-9 bg-[#161b22] border-b border-[#30363d] flex items-center overflow-x-auto no-scrollbar flex-shrink-0">
+      <div className="h-9 bg-bg-surface border-b border-border-default flex items-stretch flex-shrink-0">
+        <div className="flex-1 flex items-center overflow-x-auto no-scrollbar min-w-0" role="tablist">
         {tabs.map((tabItem, i) => (
           <div
             key={tabItem.path}
+            role="tab"
+            aria-selected={i === activeTabIndex}
+            tabIndex={0}
             onClick={() => onTabSelect(i)}
-            className={`group h-full pl-4 pr-2 flex items-center border-r border-[#30363d] text-xs cursor-pointer transition-colors flex-shrink-0 ${
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTabSelect(i); } }}
+            className={`group h-full pl-4 pr-2 flex items-center border-r border-border-default text-xs cursor-pointer transition-colors flex-shrink-0 ${
               i === activeTabIndex
-                ? 'bg-[#0d1117] text-gray-200 border-t-2 border-t-blue-500'
-                : 'text-gray-500 hover:bg-[#21262d]'
+                ? 'bg-bg-canvas text-gray-200 border-t-2 border-t-blue-500'
+                : 'text-text-muted hover:bg-bg-overlay'
             }`}
           >
             {tabIcon(tabItem.language)}
@@ -172,19 +214,26 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
             {tabItem.dirty && (
               <FontAwesomeIcon
                 icon={faCircle}
-                className="ml-2 text-[6px] text-gray-400 group-hover:hidden"
+                className="ml-2 text-[6px] text-text-secondary group-hover:hidden"
                 title={t('editor.unsaved')}
               />
             )}
             <button
               onClick={(e) => { e.stopPropagation(); onTabClose(tabItem.path); }}
-              className="ml-2 w-4 h-4 rounded hover:bg-[#30363d] flex items-center justify-center text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              className="ml-2 w-4 h-4 rounded hover:bg-border-default flex items-center justify-center text-text-muted hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
               title={t('common.close')}
+              aria-label={`${t('common.close')}: ${tabItem.name}`}
             >
-              <FontAwesomeIcon icon={faTimes} className="text-[10px]" />
+              <FontAwesomeIcon icon={faTimes} className="text-xs" />
             </button>
           </div>
         ))}
+        </div>
+        <AnalyzeButton
+          disabled={analyzing}
+          title={t('app.analyzeFileTitle', { name: tab.name })}
+          onClick={onAnalyzeFile}
+        />
       </div>
 
       {/* Monaco Editor — using `path` makes each tab a separate model */}
@@ -216,11 +265,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
       {/* Custom Context Menu */}
       {contextMenu && (
         <div
-          className="context-menu absolute z-50 bg-[#1f2937] border border-[#30363d] rounded shadow-2xl py-1 min-w-[200px]"
+          className="context-menu absolute z-(--z-overlay) bg-bg-surface border border-border-default rounded shadow-2xl py-1 min-w-[200px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onMouseLeave={() => setContextMenu(null)}
         >
-          <div className="px-3 py-1 text-[10px] text-gray-500 uppercase font-semibold border-b border-[#30363d] mb-1">
+          <div className="px-3 py-1 text-[10px] text-text-muted uppercase font-semibold border-b border-border-default mb-1">
             {t('editor.createRuleFromSelection')}
           </div>
           {CATEGORY_ITEMS.map(({ value, label, color }) => (
@@ -231,9 +280,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
                 onCreateRule(contextMenu.selectedText, value);
                 setContextMenu(null);
               }}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-[#30363d] transition-colors flex items-center"
+              className="w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-border-default transition-colors flex items-center"
             >
-              <FontAwesomeIcon icon={faWandMagicSparkles} className={`mr-2 ${color} text-[10px]`} />
+              <FontAwesomeIcon icon={faWandMagicSparkles} className={`mr-2 ${color} text-xs`} />
               {label}
             </button>
           ))}

@@ -25,11 +25,13 @@ export function ActivityBar({ activePanel, onSelect }: Props) {
   ];
 
   return (
-    <nav className="w-12 border-r border-[#30363d] bg-[#0d1117] flex flex-col items-center py-4 space-y-6 text-gray-500 flex-shrink-0">
+    <nav className="w-12 border-r border-border-default bg-bg-canvas flex flex-col items-center py-4 space-y-6 text-text-muted flex-shrink-0">
       {items.slice(0, 6).map(({ panel, icon, label }) => (
         <button
           key={panel}
           title={label}
+          aria-label={label}
+          aria-current={activePanel === panel ? 'page' : undefined}
           onClick={() => onSelect(panel)}
           className={`text-xl cursor-pointer transition-colors ${activePanel === panel ? 'text-gray-200' : 'hover:text-gray-200'}`}
         >
@@ -39,6 +41,8 @@ export function ActivityBar({ activePanel, onSelect }: Props) {
       <div className="flex-1" />
       <button
         title={t('panel.settings')}
+        aria-label={t('panel.settings')}
+        aria-current={activePanel === 'settings' ? 'page' : undefined}
         onClick={() => onSelect('settings')}
         className={`text-xl cursor-pointer transition-colors ${activePanel === 'settings' ? 'text-gray-200' : 'hover:text-gray-200'}`}
       >

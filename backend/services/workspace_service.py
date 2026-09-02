@@ -1,14 +1,25 @@
 import json
+import logging
 import os
 import string
+import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import git
 
+logger = logging.getLogger(__name__)
+
 WORKSPACE_FILE = Path(__file__).parent.parent / ".hybrid-workspace.json"
 PROJECTS_DIR = Path(__file__).parent.parent / "projects"
+
+# read-modify-write state-файла — под одной блокировкой (гонки запросов)
+_LOCK = threading.Lock()
+
+# Потолок времени на git clone (GitPython таймаут не поддерживает — subprocess)
+CLONE_TIMEOUT = 300
 
 
 class NotFoundError(ValueError):
@@ -53,6 +64,7 @@ def _load_state() -> dict:
     try:
         return json.loads(WORKSPACE_FILE.read_text(encoding="utf-8"))
     except Exception:
+        logger.exception("Не удалось прочитать state-файл workspace: %s", WORKSPACE_FILE)
         return {"current": None, "recent": []}
 
 
@@ -90,19 +102,22 @@ def set_workspace(path: str) -> dict:
         raise NotFoundError(f"Путь не существует: {p}")
     if not p.is_dir():
         raise ValueError(f"Это не папка: {p}")
-    state = _load_state()
-    state["current"] = str(p)
-    recent = [r for r in state.get("recent", []) if r != str(p)]
-    recent.insert(0, str(p))
-    state["recent"] = recent[:8]
-    _save_state(state)
+    with _LOCK:
+        state = _load_state()
+        state["current"] = str(p)
+        recent = [r for r in state.get("recent", []) if r != str(p)]
+        recent.insert(0, str(p))
+        state["recent"] = recent[:8]
+        _save_state(state)
+    logger.info("workspace open: %s", p)
     return get_workspace()
 
 
 def close_workspace() -> dict:
-    state = _load_state()
-    state["current"] = None
-    _save_state(state)
+    with _LOCK:
+        state = _load_state()
+        state["current"] = None
+        _save_state(state)
     return get_workspace()
 
 
@@ -131,9 +146,18 @@ def clone_repo(url: str, target_name: Optional[str] = None) -> str:
         raise ValueError(f"Папка уже существует: {target}")
 
     try:
-        git.Repo.clone_from(url, str(target), depth=1)
-    except git.GitCommandError as e:
-        raise ValueError(f"Git clone не удался: {e.stderr.strip() or str(e)}")
+        # GitPython clone_from не поддерживает timeout — через subprocess.
+        # URL провалидирован выше, argv-список без shell — инъекции нет.
+        subprocess.run(
+            ["git", "clone", "--depth", "1", url, str(target)],
+            timeout=CLONE_TIMEOUT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", check=True,
+        )
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"Git clone не удался: превышен таймаут {CLONE_TIMEOUT}с")
+    except (subprocess.CalledProcessError, git.GitCommandError) as e:
+        stderr = getattr(e, "stderr", "") or ""
+        raise ValueError(f"Git clone не удался: {stderr.strip() or str(e)}")
 
     return str(target)
 

@@ -10,6 +10,7 @@ import { FileTree } from './FileTree';
 import { GitPanel } from './GitPanel';
 import { SecurityPanel } from './SecurityPanel';
 import { QualityPanel } from './QualityPanel';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { useI18n, LOCALES } from '../i18n';
 
 interface Props {
@@ -105,25 +106,25 @@ function SettingsPanel() {
   };
 
   return (
-    <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
-      <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider">{t('sidebar.settingsTitle')}</div>
+    <aside className="w-64 border-r border-border-default bg-bg-canvas flex flex-col overflow-hidden flex-shrink-0">
+      <div className="p-3 text-xs uppercase font-bold text-text-muted tracking-wider">{t('sidebar.settingsTitle')}</div>
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 space-y-4 pb-4">
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('settings.language')}</label>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">{t('settings.language')}</label>
           <select
             value={locale}
             onChange={e => setLocale(e.target.value as typeof locale)}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+            className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
           >
             {LOCALES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.provider')}</label>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">{t('sidebar.provider')}</label>
           <select
             value={provider}
             onChange={e => setProvider(e.target.value)}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+            className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
           >
             <option value="lmstudio">{t('sidebar.providerLmstudio')}</option>
             <option value="openai">OpenAI</option>
@@ -131,31 +132,31 @@ function SettingsPanel() {
           </select>
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">Base URL</label>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">Base URL</label>
           <input
             type="text"
             value={baseUrl}
             onChange={e => setBaseUrl(e.target.value)}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
+            className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
           />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.model')}</label>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">{t('sidebar.model')}</label>
           <input
             type="text"
             value={model}
             onChange={e => setModel(e.target.value)}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
+            className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
           />
         </div>
         <div>
-          <label className="text-[10px] text-gray-500 uppercase font-semibold block mb-1">{t('sidebar.apiKeyOptional')}</label>
+          <label className="text-[10px] text-text-muted uppercase font-semibold block mb-1">{t('sidebar.apiKeyOptional')}</label>
           <input
             type="password"
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
             placeholder="sk-..."
-            className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
+            className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 code-font"
           />
         </div>
         <button
@@ -178,6 +179,7 @@ function SettingsPanel() {
 
 export function Sidebar(props: Props) {
   const { t } = useI18n();
+  const [ruleToDelete, setRuleToDelete] = useState<Rule | null>(null);
   const {
     panel, workspace, tree, activeFile, resultsByFile, backendOnline,
     onFileOpen, onReviewCommit, onOpenPicker, onCloseWorkspace,
@@ -187,13 +189,15 @@ export function Sidebar(props: Props) {
   if (panel === 'rules') {
     const activeCount = rules.filter(r => r.enabled).length;
     return (
-      <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
-        <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider flex justify-between items-center">
-          <span>{t('sidebar.rules')} {rules.length > 0 && <span className="text-gray-400 normal-case">({t('sidebar.rulesActive', { active: activeCount, total: rules.length })})</span>}</span>
+      <>
+      <aside className="w-64 border-r border-border-default bg-bg-canvas flex flex-col overflow-hidden flex-shrink-0">
+        <div className="p-3 text-xs uppercase font-bold text-text-muted tracking-wider flex justify-between items-center">
+          <span>{t('sidebar.rules')} {rules.length > 0 && <span className="text-text-secondary normal-case">({t('sidebar.rulesActive', { active: activeCount, total: rules.length })})</span>}</span>
           <button
             onClick={onCreateRuleManually}
             className="text-blue-400 hover:text-blue-300 transition-colors"
             title={t('sidebar.createRuleManuallyTitle')}
+            aria-label={t('sidebar.createRuleManuallyTitle')}
           >
             <FontAwesomeIcon icon={faPlus} />
           </button>
@@ -211,7 +215,7 @@ export function Sidebar(props: Props) {
         <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-2 pb-4">
           {rules.length === 0 && (
             <div className="text-center mt-6 px-2">
-              <p className="text-xs text-gray-500 leading-relaxed">
+              <p className="text-xs text-text-muted leading-relaxed">
                 {t('sidebar.noRulesLine1')}<br />
                 {t('sidebar.noRulesLine2')}<br />
                 {t('sidebar.noRulesLine3')}
@@ -221,42 +225,40 @@ export function Sidebar(props: Props) {
           {rules.map(rule => (
             <div
               key={rule.id}
-              className={`bg-[#161b22] border rounded p-2 space-y-1.5 transition-colors ${
-                rule.enabled ? 'border-[#30363d]' : 'border-[#30363d] opacity-50'
+              className={`bg-bg-surface border rounded p-2 space-y-1.5 transition-colors ${
+                rule.enabled ? 'border-border-default' : 'border-border-default opacity-50'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${categoryColor[rule.category]}`}>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded font-semibold ${categoryColor[rule.category]}`}>
                   {t(categoryLabelKey(rule.category)).toUpperCase()}
                 </span>
                 <button
                   onClick={() => onToggleRule(rule.id, !rule.enabled)}
-                  className={`text-[9px] px-2 py-0.5 rounded font-semibold transition-colors ${
+                  className={`text-[11px] px-2 py-0.5 rounded font-semibold transition-colors ${
                     rule.enabled
                       ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                      : 'bg-gray-600/30 text-gray-500 hover:bg-gray-500/40'
+                      : 'bg-gray-600/30 text-text-muted hover:bg-gray-500/40'
                   }`}
                   title={rule.enabled ? t('rules.clickToDisable') : t('rules.clickToEnable')}
                 >
                   {rule.enabled ? t('rules.stateActive') : t('rules.stateInactive')}
                 </button>
               </div>
-              <p className="text-[11px] text-gray-300 leading-relaxed font-medium">{rule.description}</p>
-              <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-3">{rule.pattern_description}</p>
-              <div className="flex justify-end space-x-1 pt-1 border-t border-[#30363d]">
+              <p className="text-xs text-text-primary leading-relaxed font-medium">{rule.description}</p>
+              <p className="text-xs text-text-muted leading-relaxed line-clamp-3">{rule.pattern_description}</p>
+              <div className="flex justify-end space-x-1 pt-1 border-t border-border-default">
                 <button
                   onClick={() => onEditRule(rule)}
-                  className="px-2 py-0.5 text-[9px] text-gray-400 hover:text-blue-300 transition-colors flex items-center"
+                  className="px-2 py-0.5 text-[11px] text-text-secondary hover:text-blue-300 transition-colors flex items-center"
                   title={t('common.edit')}
                 >
                   <FontAwesomeIcon icon={faPencil} className="mr-1" />
                   {t('common.edit')}
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(t('rules.deleteConfirm', { description: rule.description }))) onDeleteRule(rule.id);
-                  }}
-                  className="px-2 py-0.5 text-[9px] text-gray-400 hover:text-red-400 transition-colors flex items-center"
+                  onClick={() => setRuleToDelete(rule)}
+                  className="px-2 py-0.5 text-[11px] text-text-secondary hover:text-red-400 transition-colors flex items-center"
                   title={t('common.delete')}
                 >
                   <FontAwesomeIcon icon={faTrash} className="mr-1" />
@@ -267,6 +269,19 @@ export function Sidebar(props: Props) {
           ))}
         </div>
       </aside>
+      {ruleToDelete && (
+        <ConfirmDialog
+          title={t('rules.deleteConfirmTitle')}
+          body={t('rules.deleteConfirm', { description: ruleToDelete.description })}
+          confirmLabel={t('common.delete')}
+          onConfirm={() => {
+            onDeleteRule(ruleToDelete.id);
+            setRuleToDelete(null);
+          }}
+          onCancel={() => setRuleToDelete(null)}
+        />
+      )}
+      </>
     );
   }
 
@@ -327,13 +342,14 @@ export function Sidebar(props: Props) {
 
   // Explorer panel
   return (
-    <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
-      <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider flex justify-between items-center">
+    <aside className="w-64 border-r border-border-default bg-bg-canvas flex flex-col overflow-hidden flex-shrink-0">
+      <div className="p-3 text-xs uppercase font-bold text-text-muted tracking-wider flex justify-between items-center">
         <span>{t('sidebar.explorer')}</span>
         <button
           onClick={onOpenPicker}
-          className="text-gray-400 hover:text-white transition-colors text-xs"
+          className="text-text-secondary hover:text-white transition-colors text-xs"
           title={t('sidebar.openOrSwitchProject')}
+          aria-label={t('sidebar.openOrSwitchProject')}
         >
           <FontAwesomeIcon icon={faFolderOpen} />
         </button>
@@ -341,7 +357,7 @@ export function Sidebar(props: Props) {
 
       {/* Backend offline warning */}
       {!backendOnline && (
-        <div className="mx-2 my-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-[10px] text-red-400 flex items-start">
+        <div className="mx-2 my-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-400 flex items-start">
           <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1.5 mt-0.5 flex-shrink-0" />
           <span>{t('sidebar.backendOfflineLine1')}<br />{t('sidebar.backendOfflineLine2')}</span>
         </div>
@@ -350,17 +366,18 @@ export function Sidebar(props: Props) {
       <div className="flex-1 overflow-y-auto custom-scrollbar text-sm">
         {/* Workspace header */}
         {workspace && (
-          <div className="px-3 py-2 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between">
+          <div className="px-3 py-2 bg-bg-surface border-b border-border-default flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="text-xs text-gray-200 font-semibold truncate" title={workspace.path}>
                 {workspace.name}
               </div>
-              <div className="text-[9px] text-gray-500 truncate code-font">{workspace.path}</div>
+              <div className="text-[11px] text-text-muted truncate code-font">{workspace.path}</div>
             </div>
             <button
               onClick={onCloseWorkspace}
-              className="ml-2 text-gray-500 hover:text-red-400 text-xs"
+              className="ml-2 text-text-muted hover:text-red-400 text-xs"
               title={t('sidebar.closeProject')}
+              aria-label={t('sidebar.closeProject')}
             >
               <FontAwesomeIcon icon={faXmark} />
             </button>
@@ -371,7 +388,7 @@ export function Sidebar(props: Props) {
         {!workspace && backendOnline && (
           <div className="p-4 text-center">
             <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs text-text-muted mb-3">
               {t('sidebar.openFolderHint1')}<br />{t('sidebar.openFolderHint2')}
             </p>
             <button
@@ -396,13 +413,13 @@ export function Sidebar(props: Props) {
         )}
 
         {workspace && !tree && (
-          <p className="text-xs text-gray-500 text-center py-4">{t('sidebar.loadingTree')}</p>
+          <p className="text-xs text-text-muted text-center py-4">{t('sidebar.loadingTree')}</p>
         )}
 
         {/* Problems summary */}
         {Object.keys(resultsByFile).length > 0 && (
           <>
-            <div className="mt-4 p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider border-t border-[#30363d]">
+            <div className="mt-4 p-3 text-xs uppercase font-bold text-text-muted tracking-wider border-t border-border-default">
               <FontAwesomeIcon icon={faDatabase} className="mr-1" /> {t('sidebar.problems')}
             </div>
             <div className="px-3 space-y-1 pb-4">
@@ -411,7 +428,7 @@ export function Sidebar(props: Props) {
                   <button
                     key={path}
                     onClick={() => onFileOpen(path)}
-                    className="w-full text-left text-[11px] text-gray-400 hover:text-blue-300 py-0.5 flex justify-between"
+                    className="w-full text-left text-xs text-text-secondary hover:text-blue-300 py-0.5 flex justify-between"
                   >
                     <span className="truncate" title={path}>{path.split('/').pop()}</span>
                     <span className="text-orange-400 ml-2 flex-shrink-0">{res.violations.length}</span>
@@ -425,10 +442,10 @@ export function Sidebar(props: Props) {
 
       {/* Footer with workspace actions */}
       {workspace && (
-        <div className="p-2 border-t border-[#30363d]">
+        <div className="p-2 border-t border-border-default">
           <button
             onClick={onOpenPicker}
-            className="w-full text-[10px] text-gray-400 hover:text-white py-1 px-2 rounded hover:bg-[#21262d] transition-colors flex items-center justify-center"
+            className="w-full text-xs text-text-secondary hover:text-white py-1 px-2 rounded hover:bg-bg-overlay transition-colors flex items-center justify-center"
           >
             <FontAwesomeIcon icon={faFolderOpen} className="mr-1.5" />
             {t('sidebar.switchProject')}

@@ -56,13 +56,13 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
   };
 
   return (
-    <aside className="w-64 border-r border-[#30363d] bg-[#0d1117] flex flex-col overflow-hidden flex-shrink-0">
-      <div className="p-3 text-[11px] uppercase font-bold text-gray-500 tracking-wider flex justify-between items-center">
+    <aside className="w-64 border-r border-border-default bg-bg-canvas flex flex-col overflow-hidden flex-shrink-0">
+      <div className="p-3 text-xs uppercase font-bold text-text-muted tracking-wider flex justify-between items-center">
         <span>Git</span>
         <button
           onClick={refresh}
           disabled={!workspace || busy !== null}
-          className="text-gray-400 hover:text-white transition-colors disabled:opacity-40"
+          className="text-text-secondary hover:text-white transition-colors disabled:opacity-40"
           title={t('git.refresh')}
         >
           <FontAwesomeIcon icon={faRotate} spin={busy === 'refresh'} />
@@ -72,12 +72,12 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
       {!workspace && (
         <div className="p-4 text-center">
           <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600 mb-2" />
-          <p className="text-xs text-gray-500">{t('git.openProjectHint1')}<br />{t('git.openProjectHint2')}</p>
+          <p className="text-xs text-text-muted">{t('git.openProjectHint1')}<br />{t('git.openProjectHint2')}</p>
         </div>
       )}
 
       {workspace && notRepo && (
-        <div className="mx-2 mt-2 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-[10px] text-yellow-400 flex items-start">
+        <div className="mx-2 mt-2 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-xs text-yellow-400 flex items-start">
           <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1.5 mt-0.5 flex-shrink-0" />
           <span>{t('git.notRepo')}</span>
         </div>
@@ -86,17 +86,17 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
       {workspace && status && (
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">
           {/* Branch & sync state */}
-          <div className="px-3 py-2 bg-[#161b22] border-b border-[#30363d]">
+          <div className="px-3 py-2 bg-bg-surface border-b border-border-default">
             <div className="flex items-center text-xs text-gray-200">
-              <FontAwesomeIcon icon={faCodeBranch} className="mr-1.5 text-gray-500" />
+              <FontAwesomeIcon icon={faCodeBranch} className="mr-1.5 text-text-muted" />
               <span className="font-semibold code-font">{status.branch ?? t('git.detachedHead')}</span>
-              <span className="ml-2 text-[10px] text-gray-500 code-font">{status.head}</span>
+              <span className="ml-2 text-xs text-text-muted code-font">{status.head}</span>
             </div>
-            <div className="flex items-center space-x-2 mt-1 text-[10px]">
+            <div className="flex items-center space-x-2 mt-1 text-xs">
               {status.tracking ? (
-                <span className="text-gray-500 code-font truncate" title={status.tracking}>→ {status.tracking}</span>
+                <span className="text-text-muted code-font truncate" title={status.tracking}>→ {status.tracking}</span>
               ) : (
-                <span className="text-gray-500">{t('git.noUpstream')}</span>
+                <span className="text-text-muted">{t('git.noUpstream')}</span>
               )}
               {status.ahead > 0 && (
                 <span className="text-green-400 flex items-center" title={t('git.aheadTitle')}>
@@ -113,7 +113,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
 
           {/* Notice */}
           {notice && (
-            <div className={`mx-2 mt-2 p-2 rounded text-[10px] border ${
+            <div className={`mx-2 mt-2 p-2 rounded text-xs border ${
               notice.kind === 'ok'
                 ? 'bg-green-900/20 border-green-500/30 text-green-400'
                 : 'bg-red-900/20 border-red-500/30 text-red-400'
@@ -127,7 +127,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
             <button
               onClick={doPull}
               disabled={busy !== null}
-              className="flex-1 text-[10px] py-1.5 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40 flex items-center justify-center"
+              className="flex-1 text-xs py-1.5 rounded border border-border-default bg-bg-surface text-text-primary hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40 flex items-center justify-center"
               title="git pull --ff-only"
             >
               <FontAwesomeIcon icon={faCloudArrowDown} className="mr-1" spin={busy === 'pull'} />
@@ -136,7 +136,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
             <button
               onClick={doPush}
               disabled={busy !== null}
-              className="flex-1 text-[10px] py-1.5 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-green-500/50 hover:text-green-300 transition-colors disabled:opacity-40 flex items-center justify-center"
+              className="flex-1 text-xs py-1.5 rounded border border-border-default bg-bg-surface text-text-primary hover:border-green-500/50 hover:text-green-300 transition-colors disabled:opacity-40 flex items-center justify-center"
               title="git push"
             >
               <FontAwesomeIcon icon={faCloudArrowUp} className="mr-1" spin={busy === 'push'} />
@@ -151,7 +151,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
               onChange={e => setMessage(e.target.value)}
               placeholder={t('git.commitPlaceholder')}
               rows={3}
-              className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full bg-bg-surface border border-border-default rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500 resize-none"
             />
             <button
               onClick={handleCommit}
@@ -167,7 +167,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
           <div className="px-2 mt-2">
             <button
               onClick={() => setPrOpen(o => !o)}
-              className="w-full text-[10px] py-1.5 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-purple-500/50 hover:text-purple-300 transition-colors flex items-center justify-center"
+              className="w-full text-xs py-1.5 rounded border border-border-default bg-bg-surface text-text-primary hover:border-purple-500/50 hover:text-purple-300 transition-colors flex items-center justify-center"
               title={t('git.prToggleTitle')}
             >
               <FontAwesomeIcon icon={faCodePullRequest} className="mr-1" />
@@ -179,24 +179,24 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                   value={prTitle}
                   onChange={e => setPrTitle(e.target.value)}
                   placeholder={t('git.prTitlePlaceholder')}
-                  className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-bg-surface border border-border-default rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-purple-500"
                 />
                 <textarea
                   value={prBody}
                   onChange={e => setPrBody(e.target.value)}
                   placeholder={t('git.prBodyPlaceholder')}
                   rows={2}
-                  className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-purple-500 resize-none"
+                  className="w-full bg-bg-surface border border-border-default rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-purple-500 resize-none"
                 />
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-[10px] text-gray-500">base:</span>
+                  <span className="text-xs text-text-muted">base:</span>
                   <input
                     value={prBase}
                     onChange={e => setPrBase(e.target.value)}
-                    className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-2 py-0.5 text-[11px] text-gray-200 code-font focus:outline-none focus:border-purple-500"
+                    className="flex-1 bg-bg-surface border border-border-default rounded px-2 py-0.5 text-xs text-gray-200 code-font focus:outline-none focus:border-purple-500"
                   />
                 </div>
-                <label className="flex items-center text-[10px] text-gray-400 cursor-pointer select-none">
+                <label className="flex items-center text-xs text-text-secondary cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={prLlm}
@@ -208,7 +208,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                 <button
                   onClick={handlePr}
                   disabled={busy !== null || (!prLlm && !prTitle.trim())}
-                  className="w-full text-[11px] py-1.5 rounded border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-300 transition-colors disabled:opacity-40"
+                  className="w-full text-xs py-1.5 rounded border bg-purple-600/20 hover:bg-purple-600/40 border-purple-500/30 text-purple-300 transition-colors disabled:opacity-40"
                 >
                   {busy === 'pr' ? t('git.prCreating') : t('git.prCreate')}
                 </button>
@@ -217,7 +217,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                     href={prResult.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block text-[10px] text-purple-300 hover:text-purple-200 code-font truncate"
+                    className="block text-xs text-purple-300 hover:text-purple-200 code-font truncate"
                     title={prResult.url}
                   >
                     <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="mr-1" />
@@ -230,18 +230,18 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
 
           {/* Changed files */}
           <div className="mt-3">
-            <div className="px-3 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+            <div className="px-3 text-[10px] uppercase font-bold text-text-muted tracking-wider">
               {t('git.changes')} {status.changed.length > 0 && `(${status.changed.length})`}
             </div>
             {status.clean && (
-              <p className="px-3 mt-1 text-[11px] text-gray-500">{t('git.cleanTree')}</p>
+              <p className="px-3 mt-1 text-xs text-text-muted">{t('git.cleanTree')}</p>
             )}
             <div className="mt-1">
               {status.changed.map(f => (
                 <button
                   key={`${f.path}-${f.staged}`}
                   onClick={() => onFileOpen(f.path)}
-                  className="w-full text-left px-3 py-1 text-[11px] text-gray-400 hover:text-blue-300 hover:bg-[#161b22] flex items-center transition-colors"
+                  className="w-full text-left px-3 py-1 text-xs text-text-secondary hover:text-blue-300 hover:bg-bg-surface flex items-center transition-colors"
                   title={`${f.path} — ${statusTitle[f.status]}${f.staged ? t('git.stagedSuffix') : ''}`}
                 >
                   <span className={`w-4 font-bold code-font flex-shrink-0 ${statusStyle[f.status]}`}>
@@ -255,25 +255,25 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
 
           {/* Recent commits */}
           {commits.length > 0 && (
-            <div className="mt-3 border-t border-[#30363d]">
-              <div className="px-3 pt-2 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+            <div className="mt-3 border-t border-border-default">
+              <div className="px-3 pt-2 text-[10px] uppercase font-bold text-text-muted tracking-wider">
                 {t('git.history')}
               </div>
               {commits.map(c => (
-                <div key={c.hash} className="px-3 py-1.5 border-b border-[#21262d] group">
-                  <div className="flex items-center text-[11px]">
+                <div key={c.hash} className="px-3 py-1.5 border-b border-bg-overlay group">
+                  <div className="flex items-center text-xs">
                     <span className="text-blue-400 code-font mr-2 flex-shrink-0">{c.hash}</span>
-                    <span className="text-gray-300 truncate flex-1" title={c.message}>{c.message}</span>
+                    <span className="text-text-primary truncate flex-1" title={c.message}>{c.message}</span>
                     <button
                       onClick={() => onReviewCommit(c.hash)}
                       disabled={busy !== null}
                       className="ml-1.5 text-gray-600 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       title={t('git.reviewCommitTitle')}
                     >
-                      <FontAwesomeIcon icon={faClipboardCheck} className="text-[10px]" />
+                      <FontAwesomeIcon icon={faClipboardCheck} className="text-xs" />
                     </button>
                   </div>
-                  <div className="text-[9px] text-gray-600 mt-0.5">
+                  <div className="text-[11px] text-gray-600 mt-0.5">
                     {c.author} · {new Date(c.date).toLocaleString('ru-RU')}
                   </div>
                 </div>
@@ -283,8 +283,8 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
 
           {/* Сравнение веток */}
           {branches.length > 0 && (
-            <div className="mt-3 border-t border-[#30363d] px-3 py-2 space-y-1.5">
-              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-wider flex items-center">
+            <div className="mt-3 border-t border-border-default px-3 py-2 space-y-1.5">
+              <div className="text-[10px] uppercase font-bold text-text-muted tracking-wider flex items-center">
                 <FontAwesomeIcon icon={faCodeCompare} className="mr-1" />
                 {t('git.compareTitle')}
               </div>
@@ -292,7 +292,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                 <select
                   value={cmpBase}
                   onChange={e => setCmpBase(e.target.value)}
-                  className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-1 text-[10px] text-gray-300 focus:outline-none focus:border-blue-500"
+                  className="flex-1 bg-bg-surface border border-border-default rounded px-1.5 py-1 text-xs text-text-primary focus:outline-none focus:border-blue-500"
                 >
                   <option value="">{t('git.compareBase')}</option>
                   {branches.map(b => <option key={b} value={b}>{b}</option>)}
@@ -300,7 +300,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                 <select
                   value={cmpHead}
                   onChange={e => setCmpHead(e.target.value)}
-                  className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-1 text-[10px] text-gray-300 focus:outline-none focus:border-blue-500"
+                  className="flex-1 bg-bg-surface border border-border-default rounded px-1.5 py-1 text-xs text-text-primary focus:outline-none focus:border-blue-500"
                 >
                   <option value="HEAD">HEAD ({t('git.compareHeadCurrent')})</option>
                   {branches.map(b => <option key={b} value={b}>{b}</option>)}
@@ -309,22 +309,22 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
               <button
                 onClick={() => cmpBase && doCompare(cmpBase, cmpHead)}
                 disabled={!cmpBase || busy !== null}
-                className="w-full text-[10px] py-1 rounded border border-[#30363d] bg-[#161b22] text-gray-300 hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40"
+                className="w-full text-xs py-1 rounded border border-border-default bg-bg-surface text-text-primary hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40"
               >
                 {busy === 'compare' ? t('git.compareRunning') : t('git.compareRun')}
               </button>
               {compareResult && (
-                <div className="text-[10px] space-y-1 pt-1">
+                <div className="text-xs space-y-1 pt-1">
                   {compareResult.note ? (
-                    <p className="text-gray-500">{t('git.compareNoChanges')}</p>
+                    <p className="text-text-muted">{t('git.compareNoChanges')}</p>
                   ) : (
                     <>
-                      <p className="text-gray-400">
+                      <p className="text-text-secondary">
                         {compareResult.base} → {compareResult.head}:&nbsp;
-                        <span className={compareResult.summary.added > 0 ? 'text-red-400 font-bold' : 'text-gray-500'}>
+                        <span className={compareResult.summary.added > 0 ? 'text-red-400 font-bold' : 'text-text-muted'}>
                           {t('git.compareAdded', { count: compareResult.summary.added })}
                         </span>{' · '}
-                        <span className={compareResult.summary.removed > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}>
+                        <span className={compareResult.summary.removed > 0 ? 'text-green-400 font-bold' : 'text-text-muted'}>
                           {t('git.compareRemoved', { count: compareResult.summary.removed })}
                         </span>
                       </p>
@@ -332,7 +332,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
                         <button
                           key={i}
                           onClick={() => onFileOpen(f.path)}
-                          className="w-full text-left text-[10px] text-gray-400 hover:text-red-300 transition-colors truncate"
+                          className="w-full text-left text-xs text-text-secondary hover:text-red-300 transition-colors truncate"
                           title={f.title}
                         >
                           <span className={`mr-1 font-bold ${f.severity === 'critical' ? 'text-red-400' : f.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'}`}>+</span>
@@ -349,7 +349,7 @@ export function GitPanel({ workspace, onFileOpen, onReviewCommit }: Props) {
       )}
 
       {workspace && !status && !notRepo && (
-        <p className="text-xs text-gray-500 text-center py-4">{t('git.loadingStatus')}</p>
+        <p className="text-xs text-text-muted text-center py-4">{t('git.loadingStatus')}</p>
       )}
     </aside>
   );

@@ -13,11 +13,12 @@
     "@fortawesome/free-brands-svg-icons": "^7.2.0",
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@fortawesome/react-fontawesome": "^3.3.1",
+    "@monaco-editor/loader": "^1.7.0",
     "@monaco-editor/react": "^4.7.0",
     "axios": "^1.16.0",
+    "monaco-editor": "^0.56.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "uuid": "^14.0.0"
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,8 +35,5 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"
-  },
-  "overrides": {
-    "dompurify": "^3.4.14"
   }
 }
